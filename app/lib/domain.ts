@@ -83,7 +83,7 @@ export type Person = {
   id: string;
   name: string;
   role: ProviderRole;
-  kind: 'ai-persona';
+  kind: 'ai-persona' | 'counselor' | 'peer-listener';
   domain: string;
   specialty: string;
   intro: string;
@@ -95,7 +95,11 @@ export type Person = {
   modes: CommMode[];
   availabilityLabel: string;
   actuallyAvailable: boolean;
-  sample: true;
+  sample?: boolean;
+  avatarUrl?: string;
+  rating?: number;
+  experienceYears?: number;
+  isVerified?: boolean;
 };
 
 export type SessionRequest = {

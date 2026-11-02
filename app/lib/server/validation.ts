@@ -38,6 +38,21 @@ export const chairJoinSchema=z.object({
   code:z.string().trim().toUpperCase().regex(/^[A-Z2-9]{6}$/),
   displayName:z.string().trim().max(80).optional(),
 });
+export const callCreateSchema=z.object({
+  source:z.enum(['chair','request']),
+  sourceId:z.string().trim().min(1).max(80),
+  media:z.enum(['voice','video']).default('voice'),
+});
+export const callActSchema=z.object({
+  id:z.string().trim().min(1).max(80),
+  action:z.enum(['join','offer','answer','ice','hangup']),
+  sdp:z.string().max(20000).optional(),
+  candidate:z.object({
+    candidate:z.string().trim().min(1).max(2000),
+    sdpMid:z.string().max(80).nullable().optional(),
+    sdpMLineIndex:z.number().int().nullable().optional(),
+  }).optional(),
+});
 export const chairActSchema=z.object({
   id:z.string().trim().min(1).max(80),
   action:z.enum(['start','next','pause','resume','leave','note','ai-turn','call']),

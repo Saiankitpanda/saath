@@ -47,3 +47,27 @@ export const chairSessions = sqliteTable('chair_sessions', {
   index('chairs_host_idx').on(table.hostId),
   index('chairs_guest_idx').on(table.guestId),
 ]);
+export const callSessions = sqliteTable('call_sessions', {
+  id: text('id').primaryKey(),
+  code: text('code').notNull(),
+  hostId: text('host_id').notNull(),
+  guestId: text('guest_id').notNull(),
+  hostName: text('host_name').notNull(),
+  guestName: text('guest_name').notNull(),
+  source: text('source').notNull(),
+  sourceId: text('source_id').notNull(),
+  status: text('status').notNull().default('ringing'),
+  provider: text('provider').notNull().default('webrtc'),
+  media: text('media').notNull().default('voice'),
+  hostSdp: text('host_sdp').notNull().default(''),
+  guestSdp: text('guest_sdp').notNull().default(''),
+  hostIce: text('host_ice').notNull().default('[]'),
+  guestIce: text('guest_ice').notNull().default('[]'),
+  livekitRoom: text('livekit_room').notNull().default(''),
+  updatedAt: text('updated_at').notNull(),
+}, table => [
+  uniqueIndex('calls_code_idx').on(table.code),
+  index('calls_host_idx').on(table.hostId),
+  index('calls_guest_idx').on(table.guestId),
+  index('calls_source_idx').on(table.source, table.sourceId),
+]);

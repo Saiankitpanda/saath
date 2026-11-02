@@ -15,6 +15,7 @@ type Props = {
   go: (view: View) => void;
   onTalkWithPersona: (person: Person) => void;
   onAskForPerson: () => void;
+  onStartCall: (requestId: string) => void;
 };
 
 export default function ArriveHome({
@@ -28,6 +29,7 @@ export default function ArriveHome({
   go,
   onTalkWithPersona,
   onAskForPerson,
+  onStartCall,
 }: Props) {
   const latest = moods[0] ?? null;
   const pendingIncoming = incoming.filter(item => item.status === 'pending');
@@ -63,10 +65,10 @@ export default function ArriveHome({
         {personReady ? (
           <>
             <h2>A person has accepted.</h2>
-            <p>{personReady.providerName} accepted your request. Open Two Chairs when you are both ready. Voice is not claimed unless a room provider is configured.</p>
+            <p>{personReady.providerName} accepted your request. You can open Two Chairs or start a voice call. The microphone stays off until you join.</p>
             <div className="inline-actions">
-              <button type="button" className="button" onClick={() => go('chairs')}>Open Two Chairs <ArrowRight size={16}/></button>
-              <button type="button" className="outline-button" onClick={() => go('activities')}>Do a shared activity</button>
+              <button type="button" className="button" onClick={() => onStartCall(personReady.id)}>Start a voice call <ArrowRight size={16}/></button>
+              <button type="button" className="outline-button" onClick={() => go('chairs')}>Open Two Chairs</button>
             </div>
           </>
         ) : pendingIncoming.length ? (
@@ -136,8 +138,7 @@ export default function ArriveHome({
           ))}
         </div>
         <div className="inline-actions">
-          <button type="button" className="outline-button" onClick={() => go('activities')}>Do a written activity</button>
-          <button type="button" className="quiet" onClick={() => go('space')}>Open up in My space</button>
+          <button type="button" className="quiet" onClick={() => go('space')}>Open My space</button>
         </div>
       </section>
 
@@ -148,8 +149,7 @@ export default function ArriveHome({
           <button type="button" onClick={() => go('connect')}><strong>A person</strong><span>Pair with a listener who has shared a code.</span></button>
           <button type="button" onClick={() => go('rehearsal')}><strong>Practise</strong><span>Find words with a fictional counterpart.</span></button>
           <button type="button" onClick={() => go('chairs')}><strong>Two Chairs</strong><span>Same-device, AI chair, or a joined person.</span></button>
-          <button type="button" onClick={() => go('activities')}><strong>Activities</strong><span>Quiet, spiritual, or shared written tasks.</span></button>
-          <button type="button" onClick={() => go('circles')}><strong>Circles</strong><span>Shared-experience groups. Not open yet.</span></button>
+          <button type="button" onClick={() => go('activities')}><strong>Activities</strong><span>Quiet written tasks in this browser.</span></button>
           <button type="button" onClick={() => go('space')}><strong>My space</strong><span>Private notes, requests, and reflections.</span></button>
         </div>
       </section>
