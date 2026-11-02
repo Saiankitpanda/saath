@@ -22,8 +22,9 @@ export const roleSchema=z.object({activeRole:z.enum(['client','listener'])});
 export const requestPatchSchema=z.object({id:z.string().trim().min(1).max(80),action:z.enum(['cancel','accept','decline'])});
 export const rehearsalSchema=z.object({
   messages:z.array(z.object({role:z.enum(['user','assistant']),content:z.string().trim().min(1).max(2000)})).min(1).max(16),
-  scenario:z.string().trim().min(1).max(2000),
+  scenario:z.string().trim().min(1).max(4000),
   style:z.enum(['hesitant','defensive','receptive']).default('receptive'),
+  mode:z.enum(['explore','rehearse']).default('rehearse'),
   consent:z.literal(true),
   includePrivateContext:z.literal(true).optional(),
 });

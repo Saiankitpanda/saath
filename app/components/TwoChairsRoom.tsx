@@ -165,13 +165,13 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
           />
         </div>
         <div className="chairs-intro-copy">
-          <div className="eyebrow">THE TWO-CHAIR ROOM</div>
+          <div className="eyebrow">SIT WITH SOMEONE</div>
           <h1>A hard conversation.<br/><em>A softer place to have it.</em></h1>
           <p>
-            Same-device guidance, private fictional rehearsal, or a mutually accepted remote conversation when both people have actually joined.
-            Open a room below. A second person appears only after they join.
+            After you have practised, open a room: same-device guidance, or a mutually accepted remote conversation when both people have actually joined.
+            A second person appears only after they join.
           </p>
-          <p className="small-print">No recording by default.</p>
+          <p className="small-print">No recording by default. Prefer Practise first if the words are still forming.</p>
         </div>
       </section>
 

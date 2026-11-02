@@ -147,8 +147,9 @@ export default function ArriveHome({
         <p>Nothing here is required. Look around, then choose one next step.</p>
         <div className="choice-grid arrive-explore">
           <button type="button" onClick={() => go('connect')}><strong>A person</strong><span>Pair with a listener who has shared a code.</span></button>
-          <button type="button" onClick={() => go('rehearsal')}><strong>Practise</strong><span>Find words with a fictional counterpart.</span></button>
-          <button type="button" onClick={() => go('chairs')}><strong>Two Chairs</strong><span>Same-device, AI chair, or a joined person.</span></button>
+          <button type="button" onClick={() => go('circles')}><strong>Peer circles</strong><span>Meet people with a similar lived experience and post gently.</span></button>
+          <button type="button" onClick={() => go('rehearsal')}><strong>Practise first</strong><span>Describe the scenario, unpack it, then rehearse under Two chairs.</span></button>
+          <button type="button" onClick={() => go('chairs')}><strong>Sit with someone</strong><span>Same-device, AI chair, or a joined person.</span></button>
           <button type="button" onClick={() => go('activities')}><strong>Activities</strong><span>Quiet written tasks in this browser.</span></button>
           <button type="button" onClick={() => go('space')}><strong>My space</strong><span>Private notes, requests, and reflections.</span></button>
         </div>

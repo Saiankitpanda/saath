@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { AmbientProvider, useAmbient } from "@/components/AmbientSound";
 import NeedAMoment from "@/components/NeedAMoment";
 import ArriveHome from "@/components/ArriveHome";
@@ -9,6 +9,8 @@ import ActivitiesWorkspace from "@/components/ActivitiesWorkspace";
 import ConversationRoom from "@/components/ConversationRoom";
 import Enrollment from "@/components/Enrollment";
 import TwoChairsRoom from "@/components/TwoChairsRoom";
+import PractiseRoom from "@/components/PractiseRoom";
+import PeerCircles from "@/components/PeerCircles";
 import CallRoom from "@/components/CallRoom";
 import StrangerChat from "@/components/StrangerChat";
 import StoryMoments from "@/components/StoryMoments";
@@ -21,7 +23,7 @@ import {
   saveReflections,
   toggleBlock,
 } from "@/lib/client/store";
-import { caseStudies, companionFilters, samplePeople, staticWritingPrompts, trustPoints } from "@/lib/fixtures";
+import { caseStudies, companionFilters, samplePeople, trustPoints } from "@/lib/fixtures";
 import {
   SAMPLE_PROFILE_NOTICE,
   type ActivityRecord,
@@ -44,12 +46,15 @@ import {
   Armchair,
   BookOpen,
   Check,
+  FileText,
   Globe,
   Heart,
+  Info,
   Laptop,
   Leaf,
   Menu,
   MessageCircle,
+  Moon,
   Phone,
   Plus,
   Send,
@@ -60,12 +65,10 @@ import {
   X,
 } from "lucide-react";
 
-type Message = { role: "user" | "assistant"; content: string };
-
 const paths = [
   { view: "connect" as View, n: "01", icon: MessageCircle, title: "Someone to listen.", desc: "Talk with an AI companion, or connect with a real stranger after they accept.", label: "Meet someone" },
-  { view: "rehearsal" as View, n: "02", icon: Armchair, title: "A room to practise.", desc: "Practise what’s hard to say with a clearly fictional counterpart.", label: "Enter rehearsal room" },
-  { view: "chairs" as View, n: "03", icon: Users, title: "Two chairs.", desc: "Sit with someone after they join. Text first, then a voice call if you both want it.", label: "Open Two Chairs" },
+  { view: "circles" as View, n: "02", icon: Users, title: "Peer circles.", desc: "Meet people with a similar lived experience. Discuss and post when you are ready.", label: "Join a circle" },
+  { view: "chairs" as View, n: "03", icon: Armchair, title: "Two chairs.", desc: "Practise the hard conversation first, then sit with someone when you are ready.", label: "Open Two Chairs" },
 ];
 
 function App() {
@@ -86,6 +89,8 @@ function App() {
   const [strangerNote, setStrangerNote] = useState("I would like to talk with someone when you have a moment.");
   const [strangerMode, setStrangerMode] = useState<"voice" | "chat">("voice");
   const [strangerOpen, setStrangerOpen] = useState(false);
+  const [connectionTab, setConnectionTab] = useState<"pending" | "accepted">("pending");
+  const [shareTarget, setShareTarget] = useState("");
   const [chatRequest, setChatRequest] = useState<SessionRequest | null>(null);
   const [aiChatPerson, setAiChatPerson] = useState<Person | null>(null);
   const [context, setContext] = useState("");
@@ -95,13 +100,8 @@ function App() {
   const [selected, setSelected] = useState<Person | null>(null);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [scenario, setScenario] = useState("Setting a boundary");
-  const [goal, setGoal] = useState("Say the first sentence clearly");
-  const [style, setStyle] = useState("Receptive");
-  const [aiConsent, setAiConsent] = useState(false);
-  const [includeContext, setIncludeContext] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [draft, setDraft] = useState("");
+  const [chairsFocus, setChairsFocus] = useState<"practise" | "room">("practise");
+  const [practiseSeed, setPractiseSeed] = useState<{ situation?: string; story?: string; goal?: string } | null>(null);
   const [modal, setModal] = useState<"approach" | "join" | "privacy" | "phrase" | null>(null);
   const [phrase, setPhrase] = useState("");
   const [phrasePerson, setPhrasePerson] = useState<Person | null>(null);
@@ -115,7 +115,6 @@ function App() {
   const [conversation, setConversation] = useState<ConversationRecord | null>(null);
   const [activeCall, setActiveCall] = useState<PublicCall | null>(null);
   const [submitLock, setSubmitLock] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const fixtures = loadFixtures();
@@ -134,15 +133,20 @@ function App() {
     const intended = params.get("enroll");
     if (intended === "client" || intended === "listener") setView("enroll");
     const requestedView = params.get("view");
-    if (requestedView === "circles" || requestedView === "onboard") {
-      setView(requestedView === "onboard" ? "enroll" : "connect");
+    const focus = params.get("focus");
+    if (focus === "practise" || focus === "room") setChairsFocus(focus);
+    if (requestedView === "onboard") {
+      setView("enroll");
+    } else if (requestedView === "rehearsal") {
+      setView("chairs");
+      setChairsFocus("practise");
     } else if (
       requestedView === "chairs" ||
       requestedView === "connect" ||
+      requestedView === "circles" ||
       requestedView === "arrive" ||
       requestedView === "space" ||
       requestedView === "activities" ||
-      requestedView === "rehearsal" ||
       requestedView === "enroll"
     ) {
       setView(requestedView);
@@ -206,7 +210,8 @@ function App() {
   }, [selected, modal]);
 
   function go(next: View) {
-    const resolved = next === "circles" ? "connect" : next === "onboard" ? "enroll" : next;
+    const resolved = next === "onboard" ? "enroll" : next === "rehearsal" ? "chairs" : next;
+    if (next === "rehearsal") setChairsFocus("practise");
     setView(resolved);
     setMobile(false);
     setNotice("");
@@ -215,13 +220,15 @@ function App() {
   function flash(message: string) { setNotice(message); }
   function talkWithPersona(person: Person) {
     setAiChatPerson(null);
-    setScenario(person.domain);
-    setGoal(`Talk about ${person.specialty.toLowerCase()}`);
-    setStyle("Receptive");
-    setMessages([]);
     setSelected(null);
-    go("rehearsal");
-    flash(`${person.name} is a fictional AI companion. Voice-style chat here — no video. AI replies need a configured provider.`);
+    setPractiseSeed({
+      situation: person.specialty || "Just need to talk",
+      story: `${person.name} · ${person.intro}\nI want to talk about: ${person.quote}`,
+      goal: `Talk about ${person.specialty.toLowerCase()}`,
+    });
+    setChairsFocus("practise");
+    go("chairs");
+    flash(`${person.name} is a fictional AI companion. Describe your scenario under Two chairs → Practise, then rehearse. No video with AI.`);
   }
 
   function dmWithPersona(person: Person) {
@@ -379,48 +386,6 @@ function App() {
     }
   }
 
-  async function sendRehearsal(event: FormEvent) {
-    event.preventDefault();
-    if (!draft.trim() || busy || submitLock) return;
-    if (!aiConsent) {
-      flash("Please allow AI processing before sending your practice conversation.");
-      return;
-    }
-    const submitted = includeContext && context.trim()
-      ? `${draft.trim()}\n\nContext I chose to include:\n${context.trim()}`
-      : draft.trim();
-    const next: Message[] = [...messages, { role: "user", content: submitted }];
-    setMessages(next);
-    setDraft("");
-    setBusy(true);
-    setSubmitLock(true);
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    try {
-      const result = await fetch("/api/rehearse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          messages: next.slice(-15),
-          scenario: `${scenario}. Goal: ${goal}`,
-          style: style.toLowerCase(),
-          consent: true,
-        }),
-      });
-      const data = await result.json() as { reply?: string; error?: string };
-      if (!result.ok) throw new Error(data.error || "The rehearsal could not continue.");
-      if (data.reply) setMessages([...next, { role: "assistant", content: data.reply }]);
-    } catch (error) {
-      if ((error as Error).name === "AbortError") flash("Rehearsal cancelled. Nothing extra was added.");
-      else flash((error as Error).message);
-    } finally {
-      setBusy(false);
-      setSubmitLock(false);
-    }
-  }
-
   const filtered = samplePeople.filter(person =>
     !blocks.includes(person.id)
     && (companionFilter === "all" || person.category === companionFilter)
@@ -451,8 +416,8 @@ function App() {
         <nav className={mobile ? "main-nav open" : "main-nav"} aria-label="Main navigation">
           <button className={view === "arrive" ? "active" : ""} onClick={() => go("arrive")}>Your visit</button>
           <button className={view === "connect" ? "active" : ""} onClick={() => go("connect")}>Listen</button>
-          <button className={view === "rehearsal" ? "active" : ""} onClick={() => go("rehearsal")}>Practise</button>
-          <button className={view === "chairs" ? "active" : ""} onClick={() => go("chairs")}>Two chairs</button>
+          <button className={view === "circles" ? "active" : ""} onClick={() => go("circles")}>Circles</button>
+          <button className={view === "chairs" ? "active" : ""} onClick={() => { setChairsFocus("practise"); go("chairs"); }}>Two chairs</button>
           <button className={view === "space" ? "active" : ""} onClick={() => go("space")}>My space</button>
         </nav>
         <div className="header-actions">
@@ -500,18 +465,19 @@ function App() {
             <svg className="thread" viewBox="0 0 400 120" aria-hidden="true"><path d="M0 95 C95 140 230 15 200 20 C150 28 195 120 400 0"/></svg>
           </section>
           <section className="topic-strip">
-            <div><span className="eyebrow">START HERE</span><h2>One path. Five places.</h2></div>
+            <div><span className="eyebrow">START HERE</span><h2>One path. Six places.</h2></div>
             <div className="topic-pills">
               <button onClick={() => go("arrive")}><span className="topic-icon tint-0"><Heart size={18}/></span>Your visit<ArrowUpRight className="pill-arrow" size={14}/></button>
               <button onClick={() => go("connect")}><span className="topic-icon tint-1"><MessageCircle size={18}/></span>Listen<ArrowUpRight className="pill-arrow" size={14}/></button>
-              <button onClick={() => go("rehearsal")}><span className="topic-icon tint-2"><Sparkles size={18}/></span>Practise<ArrowUpRight className="pill-arrow" size={14}/></button>
-              <button onClick={() => go("chairs")}><span className="topic-icon tint-3"><Armchair size={18}/></span>Two chairs<ArrowUpRight className="pill-arrow" size={14}/></button>
+              <button onClick={() => go("circles")}><span className="topic-icon tint-2"><Users size={18}/></span>Circles<ArrowUpRight className="pill-arrow" size={14}/></button>
+              <button onClick={() => { setChairsFocus("practise"); go("chairs"); }}><span className="topic-icon tint-2"><Sparkles size={18}/></span>Practise first<ArrowUpRight className="pill-arrow" size={14}/></button>
+              <button onClick={() => { setChairsFocus("room"); go("chairs"); }}><span className="topic-icon tint-3"><Armchair size={18}/></span>Two chairs<ArrowUpRight className="pill-arrow" size={14}/></button>
               <button onClick={() => go("space")}><span className="topic-icon tint-0"><BookOpen size={18}/></span>My space<ArrowUpRight className="pill-arrow" size={14}/></button>
             </div>
           </section>
           <section className="section pathways">
             <div className="section-head">
-              <div><div className="eyebrow">THREE WAYS IN</div><h2>A person, a practice room,<br/>or two chairs.</h2></div>
+              <div><div className="eyebrow">WAYS IN</div><h2>Listen, peers,<br/>or two chairs.</h2></div>
               <p>Pick one to start.</p>
             </div>
             <div className="path-grid">
@@ -604,19 +570,33 @@ function App() {
             />
           )}
 
+          {view === "circles" && (
+            <PeerCircles
+              auth={auth}
+              displayName={displayName}
+              onNotice={flash}
+            />
+          )}
+
           {view === "connect" && (
-            <>
+            <div className="listen-shell">
               <section className="listen-hero">
+                <div className="listen-hero-media" aria-hidden="true">
+                  <img src="/assets/saath-listen-hero.jpg" alt="" />
+                </div>
+                <div className="listen-hero-veil" aria-hidden="true" />
                 <div className="listen-hero-copy">
                   <div className="eyebrow">A LITTLE SPACE FOR YOU</div>
                   <h1>Some things feel lighter<br/>when you <em>say them.</em></h1>
                   <p>Choose an AI companion for voice chat or a private DM. No video with AI — that keeps the space soft and clear.</p>
-                  <button className="button" type="button" onClick={() => document.getElementById("companions")?.scrollIntoView({ behavior: "smooth" })}>
-                    Meet your companion <ArrowRight size={17}/>
-                  </button>
-                </div>
-                <div className="listen-hero-art">
-                  <img src="/assets/saath-rehearsal.png" alt="Two chairs in a quiet room, ready for a conversation"/>
+                  <div className="listen-hero-actions">
+                    <button className="button" type="button" onClick={() => document.getElementById("companions")?.scrollIntoView({ behavior: "smooth" })}>
+                      Meet your companion <ArrowRight size={17}/>
+                    </button>
+                    <button className="text-button listen-hero-ghost" type="button" onClick={() => { setStrangerOpen(true); document.getElementById("strangers")?.scrollIntoView({ behavior: "smooth" }); }}>
+                      Or ask a stranger later
+                    </button>
+                  </div>
                 </div>
               </section>
 
@@ -643,24 +623,35 @@ function App() {
                   ))}
                 </div>
                 <div className="companion-grid">
-                  {filtered.map(person => (
-                    <article className={"companion-card tone-" + person.color} key={person.id}>
-                      <div className={"companion-avatar " + person.color}>{person.initials}</div>
-                      <div className="companion-meta">
-                        <h3>{person.name}</h3>
-                        <span className="companion-badge">AI companion</span>
+                  {filtered.map((person, index) => (
+                    <article className={"companion-card tone-" + person.color} key={person.id} style={{ animationDelay: `${index * 70}ms` }}>
+                      <div className="companion-portrait">
+                        {person.avatarUrl ? (
+                          <img src={person.avatarUrl} alt="" />
+                        ) : (
+                          <div className={"companion-avatar " + person.color} aria-hidden="true">{person.initials}</div>
+                        )}
+                        <span className="companion-portrait-mark" aria-hidden="true">{person.initials}</span>
                       </div>
-                      <p className="companion-tag">{companionIcon(person.category)} {person.tag}</p>
-                      <p>{person.intro}</p>
-                      <blockquote>“{person.quote}”</blockquote>
-                      <p className="companion-modes-note">Voice chat or DM · no video with AI</p>
-                      <div className="companion-actions">
-                        <button className="button" type="button" onClick={() => talkWithPersona(person)}>
-                          <Phone size={15}/> Voice with {person.name}
-                        </button>
-                        <button className="outline-button" type="button" onClick={() => dmWithPersona(person)}>
-                          <MessageCircle size={15}/> DM
-                        </button>
+                      <div className="companion-body">
+                        <header className="companion-top">
+                          <div className="companion-meta">
+                            <span className="companion-badge">AI companion</span>
+                            <h3>{person.name}</h3>
+                            <p className="companion-tag">{companionIcon(person.category)} {person.tag}</p>
+                          </div>
+                        </header>
+                        <p className="companion-intro">{person.intro}</p>
+                        <blockquote className="companion-quote">“{person.quote}”</blockquote>
+                        <p className="companion-modes-note">Voice chat or DM · no video with AI</p>
+                        <div className="companion-actions">
+                          <button className="button" type="button" onClick={() => talkWithPersona(person)}>
+                            <Phone size={15}/> Voice with {person.name}
+                          </button>
+                          <button className="outline-button" type="button" onClick={() => dmWithPersona(person)}>
+                            <MessageCircle size={15}/> DM
+                          </button>
+                        </div>
                       </div>
                     </article>
                   ))}
@@ -813,168 +804,260 @@ function App() {
                   </div>
                 )}
               </section>
-            </>
-          )}
-
-          {view === "rehearsal" && (
-            <>
-              <div className="page-heading">
-                <div className="eyebrow">PRACTISE BEFORE YOU PRESS SEND</div>
-                <h1>Find the words.<br/><em>Keep your voice.</em></h1>
-                <p>A private practice space. The counterpart is fictional and cannot know or predict an actual person’s thoughts.</p>
-              </div>
-              <div className="rehearsal-layout">
-                <aside className="settings-panel">
-                  <img className="panel-photo" src="/assets/saath-rehearsal.png" alt="Two empty chairs in a rehearsal room"/>
-                  <h2>Set the scene</h2>
-                  <label>Scenario<select value={scenario} onChange={event => setScenario(event.target.value)}>{["Setting a boundary", "Asking for support", "Talking to a partner", "A conversation at work", "Making an apology"].map(item => <option key={item}>{item}</option>)}</select></label>
-                  <label>Goal<input value={goal} onChange={event => setGoal(event.target.value)} maxLength={160}/></label>
-                  <label>Fictional response style<select value={style} onChange={event => setStyle(event.target.value)}>{["Receptive", "Hesitant", "Defensive"].map(item => <option key={item}>{item}</option>)}</select></label>
-                  <p className="small-print">Private context is never appended automatically.</p>
-                  <label className="checkbox-label"><input type="checkbox" checked={includeContext} onChange={event => setIncludeContext(event.target.checked)}/> Include the context I write below, and only that.</label>
-                  {includeContext && <textarea value={context} onChange={event => setContext(event.target.value)} maxLength={2000} placeholder="Only the context you choose to send…"/>}
-                  <label className="checkbox-label"><input type="checkbox" checked={aiConsent} onChange={event => setAiConsent(event.target.checked)}/> I agree to send this practice conversation to the configured AI provider.</label>
-                  <button className="text-button" onClick={() => { setMessages([]); setNotice(""); abortRef.current?.abort(); }}>Restart and clear <Plus size={15}/></button>
-                  {busy && <button className="outline-button" onClick={() => abortRef.current?.abort()}>Cancel pending reply</button>}
-                  <span className="integration-state"><span className={ai ? "status-dot ready" : "status-dot"}/>{ai ? "AI provider configured" : "AI provider not connected yet"}</span>
-                  {!ai && (
-                    <div>
-                      <p className="small-print">No fabricated AI replies. Static writing prompts remain available.</p>
-                      {staticWritingPrompts.map(item => <button type="button" key={item} className="quiet" onClick={() => setDraft(item)}>{item}</button>)}
-                    </div>
-                  )}
-                </aside>
-                <section className="chat-panel">
-                  <div className="chat-header">
-                    <span className="ai-symbol"><Sparkles size={20}/></span>
-                    <div><strong>Your rehearsal room</strong><span>Fictional counterpart · {style.toLowerCase()} style</span></div>
-                    <span className="quiet-tag">AI</span>
-                  </div>
-                  <div className="chat-messages" aria-live="polite">
-                    {!messages.length ? (
-                      <div className="chat-empty">
-                        <span className="empty-chair"><Armchair size={43} strokeWidth={1}/></span>
-                        <h2>Take a breath.<br/>You can start anywhere.</h2>
-                        <p>Try the first sentence you wish you could say.</p>
-                        <button onClick={() => setDraft("I care about our relationship, but I need to talk about something that has been difficult for me.")}>Help me start <ArrowUpRight size={15}/></button>
-                      </div>
-                    ) : messages.map((message, index) => (
-                      <div key={index} className={"message " + message.role}><span>{message.role === "user" ? "YOU" : "FICTIONAL COUNTERPART"}</span><p>{message.content}</p></div>
-                    ))}
-                    {busy && <div className="thinking">Preparing a response…</div>}
-                  </div>
-                  <form className="chat-input" onSubmit={sendRehearsal}>
-                    <textarea aria-label="Your rehearsal message" placeholder="What would you like to say?" value={draft} onChange={event => setDraft(event.target.value)} maxLength={2000}/>
-                    <button className="round-button" aria-label="Send rehearsal message" disabled={busy || !draft.trim()}><Send size={18}/></button>
-                  </form>
-                  <div className="chat-footer">Text rehearsal · Voice is unconfigured. {!auth && <a href="/signin-with-chatgpt?return_to=/">Sign in to use AI.</a>}</div>
-                </section>
-              </div>
-            </>
+            </div>
           )}
 
           {view === "chairs" && (
-            <TwoChairsRoom
-              auth={auth}
-              displayName={displayName}
-              profile={profile}
-              aiConfigured={ai}
-              voiceConfigured={voiceConfigured}
-              onNotice={flash}
-            />
+            <div className="chairs-shell">
+              <nav className="chairs-focus-tabs" aria-label="Two chairs modes">
+                <button
+                  type="button"
+                  className={chairsFocus === "practise" ? "active" : ""}
+                  onClick={() => setChairsFocus("practise")}
+                >
+                  Practise first
+                </button>
+                <button
+                  type="button"
+                  className={chairsFocus === "room" ? "active" : ""}
+                  onClick={() => setChairsFocus("room")}
+                >
+                  Sit with someone
+                </button>
+              </nav>
+              {chairsFocus === "practise" ? (
+                <PractiseRoom
+                  auth={auth}
+                  aiConfigured={ai}
+                  privateContext={context}
+                  onPrivateContextChange={setContext}
+                  onNotice={flash}
+                  seed={practiseSeed}
+                />
+              ) : (
+                <TwoChairsRoom
+                  auth={auth}
+                  displayName={displayName}
+                  profile={profile}
+                  aiConfigured={ai}
+                  voiceConfigured={voiceConfigured}
+                  onNotice={flash}
+                />
+              )}
+            </div>
           )}
 
-          {view === "space" && (
-            <>
-              <div className="page-heading">
-                <div className="eyebrow">MY SPACE</div>
-                <h1>Your notes.<br/><em>Your requests.</em></h1>
-                <p>Save private context, review pairing requests, and start a call after someone accepts.</p>
-              </div>
+          {view === "space" && (() => {
+            const pendingRequests = requests.filter(item => item.status === "pending");
+            const acceptedRequests = requests.filter(item => item.status === "accepted");
+            const shownRequests = connectionTab === "pending" ? pendingRequests : acceptedRequests;
+            return (
+            <div className="space-shell">
+              <header className="space-top">
+                <div>
+                  <h1>Your space, at your <em>pace.</em></h1>
+                  <p>Write what you need. Share only when you choose. Nothing leaves this page until you say so.</p>
+                </div>
+                <svg className="space-branch" viewBox="0 0 160 120" aria-hidden="true">
+                  <path d="M18 98 C48 78, 72 62, 118 28" fill="none" stroke="#7f9a88" strokeWidth="2.2" strokeLinecap="round"/>
+                  <path d="M62 72 C74 58, 86 50, 104 40" fill="none" stroke="#9bb0a2" strokeWidth="1.6" strokeLinecap="round"/>
+                  <ellipse cx="128" cy="24" rx="14" ry="8" transform="rotate(-28 128 24)" fill="#8fae9a" opacity=".85"/>
+                  <ellipse cx="108" cy="38" rx="12" ry="7" transform="rotate(-18 108 38)" fill="#a8c2b0" opacity=".9"/>
+                  <ellipse cx="86" cy="52" rx="11" ry="6.5" transform="rotate(-12 86 52)" fill="#7f9a88" opacity=".8"/>
+                  <ellipse cx="68" cy="66" rx="10" ry="6" transform="rotate(-8 68 66)" fill="#9bb0a2" opacity=".75"/>
+                  <circle cx="96" cy="46" r="3.2" fill="#d4b49a"/>
+                  <circle cx="78" cy="58" r="2.6" fill="#c9a48a"/>
+                  <circle cx="116" cy="32" r="2.8" fill="#dfc2a8"/>
+                </svg>
+              </header>
+
               {!auth && (
-                <div className="sample-notice">
+                <div className="space-notice">
                   <ShieldCheck size={18}/>
-                  <span>Sign in to save context on the server. <a href="/signin-with-chatgpt?return_to=/?view=space">Sign in</a></span>
+                  <span>Sign in to save context on the server. Until then, writing stays in this browser. <a href="/signin-with-chatgpt?return_to=/?view=space">Sign in</a></span>
                 </div>
               )}
               {encryption?.atRest && (
                 <p className="small-print space-encrypt-note">At-rest encryption is on for saved context. End-to-end encryption is not claimed.</p>
               )}
-              <div className="two-column space-layout">
-                <section className="plain-panel context-panel">
-                  <BookOpen size={25} strokeWidth={1.4}/>
-                  <h2>Private context</h2>
-                  <p>What you want a listener to know — only when you choose to share it.</p>
-                  <label htmlFor="life-context">My context</label>
-                  <textarea id="life-context" value={context} onChange={event => setContext(event.target.value)} maxLength={4000} placeholder="Lately, I’ve been…"/>
-                  <span className="field-count">{context.length}/4000</span>
-                  <label>Visibility
-                    <select value={shareMode} onChange={event => setShareMode(event.target.value as "private" | "ask-first")}>
-                      <option value="private">Private</option>
-                      <option value="ask-first">Ask first before sharing</option>
-                    </select>
-                  </label>
-                  <div className="inline-actions">
-                    <button className="button" disabled={busy} onClick={saveContext}>{busy ? "Saving…" : "Save"}<Check size={16}/></button>
-                    <button className="text-button" onClick={async () => {
-                      if (auth) {
-                        try { await api("/api/context", "DELETE"); setContext(""); flash("Your saved context was deleted."); }
-                        catch (error) { flash((error as Error).message); }
-                      } else setContext("");
-                    }}>Delete</button>
-                  </div>
-                </section>
-                <section className="plain-panel">
-                  <MessageCircle size={25} strokeWidth={1.4}/>
-                  <h2>Requests</h2>
-                  <p>Pending and accepted pairing. Samples cannot accept.</p>
-                  {requests.length ? requests.map(item => (
-                    <div className="request-row" key={item.id}>
-                      <div>
-                        <strong>{item.providerName}</strong>
-                        <span>{item.topic} · {item.status}</span>
+
+              <div className="space-layout">
+                <div className="space-main">
+                  <section className="space-card space-card-share">
+                    <header className="space-card-head">
+                      <div className="space-card-title">
+                        <span className="space-card-icon"><FileText size={18} strokeWidth={1.6}/></span>
+                        <div>
+                          <h2>What I’d like to share</h2>
+                          <p>Prepare context for a future conversation.</p>
+                        </div>
                       </div>
-                      {item.status === "pending" && (
-                        <button className="quiet" onClick={async () => {
-                          try {
-                            const result = await api<{ request: SessionRequest }>("/api/requests", "PATCH", { id: item.id, action: "cancel" });
-                            setRequests(current => current.map(entry => entry.id === item.id ? result.request : entry));
-                            flash("Request cancelled.");
-                          } catch (error) { flash((error as Error).message); }
-                        }}>Cancel</button>
-                      )}
-                      {item.status === "accepted" && (
-                        <button className="quiet" type="button" disabled={busy} onClick={() => void startCall(item.id)}>Call</button>
-                      )}
-                      <span className="status-badge">{item.status}</span>
-                    </div>
-                  )) : (
-                    <div className="small-empty">
-                      <h3>No requests yet.</h3>
-                      <button className="text-button" onClick={() => go("connect")}>Go to Listen <ArrowRight size={16}/></button>
-                    </div>
-                  )}
-                  {activeCall && (
-                    <CallRoom
-                      call={activeCall}
-                      onChange={setActiveCall}
-                      onEnded={() => setActiveCall(null)}
-                      onNotice={flash}
+                      <span className="space-chip">{shareMode === "private" ? "Not shared" : "Ask first"}</span>
+                    </header>
+                    <textarea
+                      id="life-context"
+                      value={context}
+                      onChange={event => setContext(event.target.value)}
+                      maxLength={4000}
+                      placeholder="Start with what feels important…"
                     />
-                  )}
-                  <div className="inline-actions space-quick-links">
-                    <button className="text-button" onClick={() => go("chairs")}>Open Two chairs</button>
-                    <button className="text-button" onClick={() => go("intro")}>{introDone || intro ? "Edit introduction" : "Getting to Know You"}</button>
-                  </div>
-                </section>
+                    <div className="space-card-meta">
+                      <span className="field-count">{context.length}/4000</span>
+                      <label className="space-inline-label">Visibility
+                        <select value={shareMode} onChange={event => setShareMode(event.target.value as "private" | "ask-first")}>
+                          <option value="private">Private — stay with me</option>
+                          <option value="ask-first">Ask first before sharing</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div className="space-card-foot">
+                      <p className="space-hint"><Info size={14}/> Saved context is not sent automatically.</p>
+                      <div className="space-card-actions">
+                        <button className="button" disabled={busy} onClick={saveContext}>{busy ? "Saving…" : "Save context"}</button>
+                        <button className="outline-button" type="button" onClick={() => setContext("")}>Clear draft</button>
+                      </div>
+                    </div>
+                    <div className="space-share-block">
+                      <div className="space-share-title"><Send size={15}/> Share only when you choose</div>
+                      <div className="space-share-row">
+                        <select
+                          value={shareTarget}
+                          onChange={event => setShareTarget(event.target.value)}
+                          disabled={!acceptedRequests.length}
+                          aria-label="Choose a connection to share with"
+                        >
+                          <option value="">{acceptedRequests.length ? "Choose a connection" : "No accepted connections yet"}</option>
+                          {acceptedRequests.map(item => (
+                            <option key={item.id} value={item.id}>{item.providerName}</option>
+                          ))}
+                        </select>
+                        <button
+                          className="outline-button"
+                          type="button"
+                          disabled={!shareTarget || !context.trim()}
+                          onClick={() => {
+                            const peer = acceptedRequests.find(item => item.id === shareTarget);
+                            flash(peer
+                              ? `Review with ${peer.providerName} in Two chairs or DM after they accept. Context is not sent from this button alone.`
+                              : "Choose an accepted connection first.");
+                            if (peer) go("chairs");
+                          }}
+                        >
+                          Review before sharing
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="space-card space-card-notes">
+                    <header className="space-card-head">
+                      <div className="space-card-title">
+                        <span className="space-card-icon soft"><BookOpen size={18} strokeWidth={1.6}/></span>
+                        <div>
+                          <h2>Notes for myself</h2>
+                          <p>Stored in this browser. Not shared through pairing.</p>
+                        </div>
+                      </div>
+                    </header>
+                    <textarea
+                      className="space-notes-field"
+                      value={reflections}
+                      onChange={event => setReflections(event.target.value)}
+                      maxLength={4000}
+                      placeholder="A thought, a reminder, something to come back to…"
+                    />
+                    <div className="space-card-foot">
+                      <button
+                        className="button"
+                        type="button"
+                        onClick={() => { saveReflections(reflections); flash("Note saved in this browser."); }}
+                      >
+                        Save note
+                      </button>
+                      <span className="space-hint muted">Browser data can be cleared.</span>
+                    </div>
+                  </section>
+                </div>
+
+                <aside className="space-side">
+                  <section className="space-card space-card-connections">
+                    <header className="space-card-head compact">
+                      <div className="space-card-title">
+                        <span className="space-card-icon"><Users size={18} strokeWidth={1.6}/></span>
+                        <div><h2>Your connections</h2></div>
+                      </div>
+                    </header>
+                    <div className="space-tabs" role="tablist" aria-label="Connection status">
+                      <button type="button" role="tab" aria-selected={connectionTab === "pending"} className={connectionTab === "pending" ? "active" : ""} onClick={() => setConnectionTab("pending")}>
+                        Pending ({pendingRequests.length})
+                      </button>
+                      <button type="button" role="tab" aria-selected={connectionTab === "accepted"} className={connectionTab === "accepted" ? "active" : ""} onClick={() => setConnectionTab("accepted")}>
+                        Accepted ({acceptedRequests.length})
+                      </button>
+                    </div>
+                    {shownRequests.length ? shownRequests.map(item => (
+                      <div className="request-row" key={item.id}>
+                        <div>
+                          <strong>{item.providerName}</strong>
+                          <span>{item.topic} · {item.status}</span>
+                        </div>
+                        {item.status === "pending" && (
+                          <button className="quiet" onClick={async () => {
+                            try {
+                              const result = await api<{ request: SessionRequest }>("/api/requests", "PATCH", { id: item.id, action: "cancel" });
+                              setRequests(current => current.map(entry => entry.id === item.id ? result.request : entry));
+                              flash("Request cancelled.");
+                            } catch (error) { flash((error as Error).message); }
+                          }}>Cancel</button>
+                        )}
+                        {item.status === "accepted" && (
+                          <button className="quiet" type="button" disabled={busy} onClick={() => void startCall(item.id)}>Call</button>
+                        )}
+                      </div>
+                    )) : (
+                      <div className="space-empty">
+                        <Armchair size={34} strokeWidth={1.3}/>
+                        <p>{connectionTab === "pending"
+                          ? "No pending requests. Requests to real listeners will appear here."
+                          : "No accepted connections yet."}</p>
+                      </div>
+                    )}
+                    {activeCall && (
+                      <CallRoom
+                        call={activeCall}
+                        onChange={setActiveCall}
+                        onEnded={() => setActiveCall(null)}
+                        onNotice={flash}
+                      />
+                    )}
+                    <button className="outline-button space-side-cta" type="button" onClick={askForPerson}>
+                      Enter listener code
+                    </button>
+                  </section>
+
+                  <section className="space-card space-card-guide">
+                    <div className="space-guide-head">
+                      <Leaf size={18} strokeWidth={1.6}/>
+                      <h3>Before you share</h3>
+                    </div>
+                    <ul className="space-checklist">
+                      <li><Check size={14}/> Choose a recipient</li>
+                      <li><Check size={14}/> Review the exact context</li>
+                      <li><Check size={14}/> Confirm each time</li>
+                    </ul>
+                    <button className="text-button" type="button" onClick={() => go("intro")}>
+                      Manage saved details
+                    </button>
+                  </section>
+
+                  <button className="space-card space-quiet-card" type="button" onClick={() => ambient.openPanel()}>
+                    <Moon size={18} strokeWidth={1.6}/> Quiet corner
+                  </button>
+                </aside>
               </div>
-              <section className="plain-panel">
-                <h2>Private notes</h2>
-                <p>Stays in this browser. Not sent to a listener unless you paste it into context.</p>
-                <textarea value={reflections} onChange={event => { setReflections(event.target.value); saveReflections(event.target.value); }} maxLength={4000} placeholder="Notes for yourself…"/>
-              </section>
-            </>
-          )}
+            </div>
+            );
+          })()}
         </main>
       )}
 
@@ -1019,9 +1102,9 @@ function App() {
               <>
                 <div className="eyebrow">A LITTLE SUPPORT. A LITTLE SAATH.</div>
                 <h2 id="modal-title">You set the pace.</h2>
-                <div className="approach-step"><span>01</span><div><h3>Start with what you need.</h3><p>A live listener by pairing code, a fictional AI personality, or a room to practise.</p></div></div>
+                <div className="approach-step"><span>01</span><div><h3>Start with what you need.</h3><p>A live listener by pairing code, a fictional AI personality, or Two chairs to practise first.</p></div></div>
                 <div className="approach-step"><span>02</span><div><h3>Choose what to share.</h3><p>Your context is yours. Review it before any connection request.</p></div></div>
-                <div className="approach-step"><span>03</span><div><h3>Make room to be heard.</h3><p>Talk at your pace. After a person accepts, you can sit in Two Chairs and start a browser voice call if you both want it.</p></div></div>
+                <div className="approach-step"><span>03</span><div><h3>Make room to be heard.</h3><p>Under Two chairs, describe the scenario, let AI understand it, rehearse, then sit with someone when you are ready.</p></div></div>
                 <button className="button full" onClick={() => { setModal(null); go("connect"); }}>Explore Saath <ArrowRight size={17}/></button>
               </>
             )}

@@ -212,8 +212,18 @@ export type CircleRecord = {
   schedule: string;
   timezone: string;
   guidelines: string[];
-  operating: false;
+  operating: boolean;
   membership: CircleMembership;
+  theme?: string;
+};
+
+export type CirclePost = {
+  id: string;
+  circleId: string;
+  authorLabel: string;
+  body: string;
+  createdAt: string;
+  fixture?: boolean;
 };
 
 export type UrgentResource = {

@@ -12,6 +12,7 @@ import {
   type MoodKind,
   type ProviderDraft,
   type CircleMembership,
+  type CirclePost,
 } from '@/lib/domain';
 
 const KEY = 'saath-dev-fixtures-v1';
@@ -26,6 +27,7 @@ export type FixtureState = {
   providerDraft: ProviderDraft | null;
   circleMembership: Record<string, CircleMembership>;
   circleInterest: string[];
+  circlePosts: CirclePost[];
   moods: MoodEntry[];
   interests: InterestId[];
   quietThoughts: string;
@@ -50,6 +52,7 @@ function blank(): FixtureState {
     providerDraft: null,
     circleMembership: {},
     circleInterest: [],
+    circlePosts: [],
     moods: [],
     interests: [],
     quietThoughts: '',
@@ -92,6 +95,7 @@ function read(): FixtureState {
       moods: parsed.moods ?? [],
       interests: parsed.interests ?? [],
       quietThoughts: parsed.quietThoughts ?? '',
+      circlePosts: parsed.circlePosts ?? [],
       activities: (parsed.activities ?? []).map(item => ({
         ...item,
         syncKind: item.syncKind ?? 'solo',
@@ -184,6 +188,25 @@ export function addCircleInterest(name: string): string[] {
   const circleInterest = state.circleInterest.includes(name) ? state.circleInterest : [...state.circleInterest, name];
   write({ ...state, circleInterest });
   return circleInterest;
+}
+
+export function listCirclePosts(circleId?: string): CirclePost[] {
+  const posts = read().circlePosts;
+  return circleId ? posts.filter(item => item.circleId === circleId) : posts;
+}
+
+export function addCirclePost(input: { circleId: string; body: string; authorLabel?: string }): CirclePost[] {
+  const state = read();
+  const post: CirclePost = {
+    id: `post-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    circleId: input.circleId,
+    authorLabel: input.authorLabel?.trim() || 'You',
+    body: input.body.trim().slice(0, 2000),
+    createdAt: new Date().toISOString(),
+  };
+  const circlePosts = [post, ...state.circlePosts].slice(0, 200);
+  write({ ...state, circlePosts });
+  return circlePosts.filter(item => item.circleId === input.circleId);
 }
 
 export function appendConversationMessage(conversationId: string, message: ConversationMessage): ConversationRecord | null {
