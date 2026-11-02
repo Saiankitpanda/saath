@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Phone, PhoneOff } from 'lucide-react';
+import { Phone, PhoneOff, Video } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import type { PublicCall } from '@/lib/application/ports';
 
@@ -15,11 +15,14 @@ type Props = {
 export default function CallRoom({ call, onChange, onEnded, onNotice }: Props) {
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(false);
-  const localRef = useRef<HTMLAudioElement>(null);
-  const remoteRef = useRef<HTMLAudioElement>(null);
+  const localAudioRef = useRef<HTMLAudioElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peer = useRef<RTCPeerConnection | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const seenIce = useRef(new Set<string>());
+  const isVideo = call.media === 'video';
 
   useEffect(() => {
     if (call.status === 'ended') return undefined;
@@ -56,18 +59,31 @@ export default function CallRoom({ call, onChange, onEnded, onNotice }: Props) {
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: call.media === 'video',
+        video: isVideo,
       });
       stream.current = media;
-      if (localRef.current) localRef.current.srcObject = media;
+      if (isVideo) {
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = media;
+          void localVideoRef.current.play().catch(() => {});
+        }
+      } else if (localAudioRef.current) {
+        localAudioRef.current.srcObject = media;
+      }
       if (call.livekit) {
-        onNotice('LiveKit is configured. Open that room from a LiveKit client with the issued token. This preview still uses the browser path if the SDK is not loaded.');
+        onNotice('LiveKit is configured. This preview still uses the browser Meet-style path if the SDK is not loaded.');
       }
       const connection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
       peer.current = connection;
       media.getTracks().forEach(track => connection.addTrack(track, media));
       connection.ontrack = event => {
-        if (remoteRef.current) remoteRef.current.srcObject = event.streams[0];
+        const remote = event.streams[0];
+        if (isVideo && remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = remote;
+          void remoteVideoRef.current.play().catch(() => {});
+        } else if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remote;
+        }
       };
       connection.onicecandidate = event => {
         if (event.candidate) {
@@ -92,7 +108,9 @@ export default function CallRoom({ call, onChange, onEnded, onNotice }: Props) {
         await signal('answer', { sdp: answer.sdp });
       }
       setJoined(true);
-      onNotice('Microphone is on only for this call. You can hang up at any time.');
+      onNotice(isVideo
+        ? 'Camera and microphone are on only for this call. Hang up anytime.'
+        : 'Microphone is on only for this call. You can hang up at any time.');
     } catch (error) {
       teardown();
       onNotice(error instanceof Error ? error.message : 'The call could not start.');
@@ -136,26 +154,45 @@ export default function CallRoom({ call, onChange, onEnded, onNotice }: Props) {
   }
 
   return (
-    <section className="plain-panel call-room" aria-labelledby="call-title">
-      <span className="eyebrow">{call.media === 'video' ? 'VIDEO CALL' : 'VOICE CALL'}</span>
-      <h2 id="call-title">{call.status === 'ended' ? 'Call ended' : call.status === 'ringing' ? 'Calling…' : 'You are in the call.'}</h2>
-      <p>
-        {call.you === 'host' ? call.guestName : call.hostName} · {call.provider === 'livekit' ? 'LiveKit room when configured' : 'Browser call through Saath'}
-        . Nothing is recorded by Saath.
-      </p>
-      <audio ref={localRef} autoPlay muted />
-      <audio ref={remoteRef} autoPlay />
-      <div className="inline-actions">
+    <section className={"call-room meet-room " + (isVideo ? 'video' : 'voice')} aria-labelledby="call-title">
+      <div className="meet-room-head">
+        <span className="eyebrow">{isVideo ? 'VIDEO CALL · MEET STYLE' : 'VOICE CALL · MEET STYLE'}</span>
+        <h2 id="call-title">{call.status === 'ended' ? 'Call ended' : call.status === 'ringing' ? 'Calling…' : 'You are in the room.'}</h2>
+        <p>
+          {call.you === 'host' ? call.guestName : call.hostName}
+          . Browser WebRTC through Saath. Nothing is recorded by Saath.
+        </p>
+      </div>
+      {isVideo ? (
+        <div className="meet-stage">
+          <div className="meet-tile remote">
+            <video ref={remoteVideoRef} autoPlay playsInline />
+            <span>{call.you === 'host' ? call.guestName : call.hostName}</span>
+          </div>
+          <div className="meet-tile local">
+            <video ref={localVideoRef} autoPlay playsInline muted />
+            <span>You</span>
+          </div>
+        </div>
+      ) : (
+        <div className="meet-voice-stage">
+          <div className="meet-voice-orb"><Phone size={28}/></div>
+          <p>Voice only. Camera stays off.</p>
+          <audio ref={localAudioRef} autoPlay muted />
+          <audio ref={remoteAudioRef} autoPlay />
+        </div>
+      )}
+      <div className="inline-actions meet-actions">
         {!joined && call.status !== 'ended' && (
           <button type="button" className="button" disabled={busy} onClick={() => void join()}>
-            <Phone size={16}/> Join this call
+            {isVideo ? <Video size={16}/> : <Phone size={16}/>} Join
           </button>
         )}
         <button type="button" className="outline-button" disabled={busy} onClick={() => void hangup()}>
           <PhoneOff size={16}/> Hang up
         </button>
       </div>
-      <p className="small-print">The microphone is requested only after you join. A person has to be on the other side. This is not emergency dispatch.</p>
+      <p className="small-print">Mic{isVideo ? ' and camera' : ''} are requested only after Join. A person has to be on the other side.</p>
     </section>
   );
 }

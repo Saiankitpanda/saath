@@ -79,6 +79,8 @@ export type MoodEntry = {
   createdAt: string;
 };
 
+export type CompanionCategory = 'relationships' | 'work' | 'slow' | 'family';
+
 export type Person = {
   id: string;
   name: string;
@@ -87,6 +89,9 @@ export type Person = {
   domain: string;
   specialty: string;
   intro: string;
+  tag: string;
+  quote: string;
+  category: CompanionCategory;
   languages: string[];
   topics: string[];
   price: number;
@@ -100,6 +105,22 @@ export type Person = {
   rating?: number;
   experienceYears?: number;
   isVerified?: boolean;
+};
+
+export type CaseStudy = {
+  id: string;
+  headline: string;
+  opening: string;
+  body: string[];
+  highlight: string;
+  attribution: string;
+  featureUsed: string;
+};
+
+export type TrustPoint = {
+  id: string;
+  title: string;
+  text: string;
 };
 
 export type SessionRequest = {
