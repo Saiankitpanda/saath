@@ -37,10 +37,10 @@ export class RequestService {
   }
 
   async create(ownerId: OwnerId, input: CreateRequestInput): Promise<{ request: PublicRequest; notice: string }> {
-    if (input.mode !== 'chat') {
-      throw new AppError(409, 'Voice and video rooms are not connected. Chat requests can be saved; they do not contact a real person.');
-    }
     const target = await this.resolveTarget(ownerId, input);
+    if (input.mode !== 'chat' && !target.live) {
+      throw new AppError(409, 'Voice and video are only for an enrolled listener who can accept. Sample and AI personalities cannot take a call.');
+    }
     const existing = await this.requests.listByOwnerAndProvider(ownerId, target.providerId);
     const hasActive = existing.some(row => isActiveRequest(expireIfNeeded(row.status, row.createdAt, this.now())));
     if (hasActive) throw new AppError(409, 'You already have an active request with this person.');
@@ -62,6 +62,14 @@ export class RequestService {
         ? 'Request saved as pending. The enrolled listener can accept or decline it from their account.'
         : 'Request saved as pending. This does not notify, invite, or connect a real person.',
     };
+  }
+
+  async requireForCall(actorId: OwnerId, id: string): Promise<RequestRecord> {
+    const owned = await this.requests.findOwned(actorId, id);
+    const incoming = owned ? null : await this.requests.findForProvider(actorId, id);
+    const row = owned ?? incoming;
+    if (!row) throw new AppError(404, 'That request was not found.');
+    return { ...row, status: expireIfNeeded(row.status, row.createdAt, this.now()) };
   }
 
   async change(actorId: OwnerId, input: PatchRequestInput): Promise<{ request: PublicRequest }> {

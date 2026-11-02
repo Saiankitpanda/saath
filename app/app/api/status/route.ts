@@ -12,6 +12,7 @@ export async function GET() {
     aiConfigured: capabilities.aiConfigured,
     encryption: capabilities.encryption,
     voiceConfigured: capabilities.voiceConfigured,
+    calling: capabilities.calling,
     pairing: capabilities.pairing,
     twoChairs: capabilities.twoChairs,
     persistence: capabilities.persistence,

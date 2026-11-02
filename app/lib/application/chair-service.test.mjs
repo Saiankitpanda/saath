@@ -18,7 +18,7 @@ function chairs(options = {}) {
   };
 }
 
-test('same-device rooms persist turns and refuse voice until LiveKit exists', async () => {
+test('same-device rooms persist turns and refuse a call without a second person', async () => {
   const {service} = chairs();
   const created = await service.create('host-1', {mode: 'same-device', displayName: 'Riya'});
   assert.equal(created.session.status, 'waiting');
@@ -28,7 +28,7 @@ test('same-device rooms persist turns and refuse voice until LiveKit exists', as
   assert.equal(started.session.stage, 'agree');
   const next = await service.act('host-1', {id: 'chair-1', action: 'next'});
   assert.equal(next.session.stage, 'a-speaks');
-  await assert.rejects(() => service.act('host-1', {id: 'chair-1', action: 'call'}), /LIVEKIT_URL/);
+  await assert.rejects(() => service.act('host-1', {id: 'chair-1', action: 'call'}), /Calling is not available|two people/);
   await assert.rejects(() => service.read('stranger', 'chair-1'), /not found/);
 });
 

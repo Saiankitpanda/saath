@@ -10,7 +10,7 @@ This is an asset and instruction supplement, not a second application.
 
 ## Scope now
 
-Run and inspect the app; wire the provided artwork; verify existing private-context persistence; understand the frontend/API/database path. More database-backed features must wait for your authoritative schema. Payment integration and live human voice are later phases.
+Minimal path (AnkitContribution): Sites enroll → arrive → pair / Two Chairs + browser voice call (`/api/calls`), or fictional AI + context / breathe. Vinext/D1 only. Circles, counselor marketplace, and Django password auth are out of the primary UX. See `MINIMAL_CRUD.md`.
 
 ## Assets
 
@@ -27,10 +27,10 @@ Keep body text on a solid reading surface. Fit images without stretching. Deskto
 
 ## Credentials
 
-AI.env.example documents names only. For local Worker development, private values belong in ignored `.dev.vars`; production values belong in the hosting environment. Do not paste keys into chat or frontend files. No payments or calling credentials are needed for the current phase.
+AI.env.example documents names only. For local Worker development, private values belong in ignored `.dev.vars`; production values belong in the hosting environment. Do not paste keys into chat or frontend files. Browser calling uses `/api/calls` without LiveKit unless `LIVEKIT_*` are set.
 
 ## Working versus planned
 
-Current source: homepage, discovery examples, context saving routes, saved sample requests, AI text gateway (requires configuration), guided same-device Two Chairs, Circles exploration, procedural sounds, asset/voice studio.
+Current: enroll, pairing requests, Two Chairs, browser voice call signaling, AI personalities (fictional), context CRUD, breathe / Quiet corner.
 
-Planned: real provider acceptance, participant messaging/calls, operational moderation, database-backed onboarding activities/circles, payments. UI examples do not establish a real human connection.
+Deferred / optional: Circles, Django counselors / clinical / sanctuary (`DJANGO_BACKEND.md`), LiveKit rooms, payments, operational moderation.

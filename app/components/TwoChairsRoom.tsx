@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { Armchair, ArrowRight, Pause, Play, ShieldCheck } from 'lucide-react';
 import { api, localActor, setLocalActor } from '@/lib/client/api';
+import CallRoom from '@/components/CallRoom';
 import { chairSpeaker, type ChairStage, type EnrollmentProfile } from '@/lib/domain';
-import type { ChairSessionMode, PublicChair } from '@/lib/application/ports';
+import type { ChairSessionMode, PublicCall, PublicChair } from '@/lib/application/ports';
 
 const chairCopy: Record<ChairStage, { title: string; text: string }> = {
   agree: { title: 'Both people agree to participate', text: 'Stay only if both of you freely agree. Either person may pass, pause, or leave.' },
@@ -39,6 +40,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
   const [aiMessage, setAiMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [actor, setActor] = useState<'host' | 'guest'>(localActor());
+  const [call, setCall] = useState<PublicCall | null>(null);
 
   useEffect(() => {
     if (!auth) return;
@@ -115,7 +117,13 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
     if (!session) return;
     setBusy(true);
     try {
-      const result = await api<{ session: PublicChair }>('/api/chairs', 'PATCH', { id: session.id, action, ...extra });
+      const result = await api<{ session: PublicChair; call?: PublicCall }>('/api/chairs', 'PATCH', { id: session.id, action, ...extra });
+      if (result.call) {
+        setCall(result.call);
+        onNotice(result.call.provider === 'livekit'
+          ? 'A LiveKit call room is ready. Join when you want the microphone on.'
+          : 'The call is ringing. The other person joins from their account. Your microphone stays off until you join.');
+      }
       if (action === 'leave' || result.session.status === 'closed') {
         setSession(null);
         setNote('');
@@ -148,19 +156,32 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
 
   return (
     <>
-      <div className="page-heading">
-        <div className="eyebrow">LESS INTERRUPTING. MORE UNDERSTANDING.</div>
-        <h1>Two chairs.<br/><em>Room for both of you.</em></h1>
-        <p>Open a saved room. A second person is shown only after they join. The AI chair stays fictional.</p>
-      </div>
+      <section className="chairs-intro" aria-label="The two-chair room">
+        <div className="chairs-illustration">
+          <img
+            className="feature-photo"
+            src="/assets/saath-rehearsal.png"
+            alt="Two empty chairs in a quiet room"
+          />
+        </div>
+        <div className="chairs-intro-copy">
+          <div className="eyebrow">THE TWO-CHAIR ROOM</div>
+          <h1>A hard conversation.<br/><em>A softer place to have it.</em></h1>
+          <p>
+            Same-device guidance, private fictional rehearsal, or a mutually accepted remote conversation when both people have actually joined.
+            Open a room below. A second person appears only after they join.
+          </p>
+          <p className="small-print">No recording by default.</p>
+        </div>
+      </section>
 
       <div className="sample-notice">
         <ShieldCheck size={18}/>
         <span>
           {voiceConfigured
-            ? 'Voice environment values are present, but a live call room is not implemented yet. '
-            : 'Voice calling is not connected. '}
-          Text turns work now. {aiConfigured ? 'AI rehearsal is configured for the fictional chair.' : 'AI is not configured yet, so the fictional chair cannot answer.'}
+            ? 'LiveKit is configured. A paired room can open a LiveKit call. '
+            : 'Browser calling is available after a second person has actually joined. LiveKit is optional. '}
+          Text turns still work. {aiConfigured ? 'AI rehearsal is configured for the fictional chair.' : 'AI is not configured yet, so the fictional chair cannot answer.'}
         </span>
       </div>
 
@@ -314,9 +335,9 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
             </section>
             <section className="plain-panel">
               <h2>Call or invite</h2>
-              <p>Room code <strong>{session.code}</strong>. A live call is not opened from here yet.</p>
+              <p>Room code <strong>{session.code}</strong>. A voice call starts only after the other person has joined this paired room.</p>
               <div className="inline-actions">
-                <button className="outline-button" type="button" disabled={busy} onClick={() => act('call')}>Try a voice call</button>
+                <button className="outline-button" type="button" disabled={busy || session.mode !== 'paired' || !session.guestJoined} onClick={() => act('call')}>Start a voice call</button>
                 <button className="text-button" type="button" onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(`Two Chairs room ${session.code}. Join in Saath with that code when you are ready.`);
@@ -328,6 +349,14 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
               </div>
             </section>
           </div>
+          {call && (
+            <CallRoom
+              call={call}
+              onChange={setCall}
+              onEnded={() => setCall(null)}
+              onNotice={onNotice}
+            />
+          )}
         </>
       )}
     </>

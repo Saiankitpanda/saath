@@ -29,6 +29,13 @@
       "when": 1793518000000,
       "tag": "0003_chair_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793520000000,
+      "tag": "0004_call_sessions",
+      "breakpoints": true
     }
   ]
 }

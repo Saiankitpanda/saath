@@ -1,29 +1,23 @@
-# Schema mapping
+# Schema mapping (D1 — minimal keep set)
 
-Existing tables were preserved. One additive table was added so client/listener enrollment can persist. No destructive migrations were run.
+Source of truth for the AnkitContribution minimal path: `docs/MINIMAL_CRUD.md`.
 
 ## Current tables
 
-| Table | Used for | Gap |
+| Table | Used for | Notes |
 | --- | --- | --- |
-| `contexts` | Owner-private life context and share mode (`private` / `ask-first`). Encrypted at rest when `CONTEXT_ENCRYPTION_KEY` is set. | Cannot store introduction cards, reflections, or recipient-specific snapshots without mixing concerns. |
-| `session_requests` | Connection requests: pending, cancelled, expired. Owner-scoped outgoing and listener-scoped incoming. Shared notes encrypted at rest when the key is set. | Sample profiles still cannot accept. No booking slots. |
-| `profiles` | One signed-in identity, client and/or listener enrollment, active role, listener pairing code. | Not operator verification. A listener is not automatically a counsellor. |
-| `reports` | Owner-created moderation reports. | No staff queue, assignee, or block table. |
-| `ai_usage` | Per-user hourly rehearsal attempt counter. | Wording assistance is not separately metered. |
+| `contexts` | Owner-private life context and share mode. Encrypted at rest when `CONTEXT_ENCRYPTION_KEY` is set. | Not E2E. |
+| `session_requests` | Pairing requests: pending / accept / decline / cancel. | Sample AI profiles cannot accept. |
+| `profiles` | Sites identity enrollment, active role, listener pairing code. | Not a counselor marketplace. |
+| `chair_sessions` | Two Chairs sessions (paired / AI / same-device). | Live path for sitting together. |
+| `call_sessions` | Browser WebRTC call signaling (`/api/calls`). | Mic after Join; LiveKit optional. |
+| `reports` | Owner-created moderation reports. | No staff queue yet. |
+| `ai_usage` | Per-user hourly rehearsal attempt counter. | |
 
-## Required when the schema arrives
+Migrations: `app/drizzle/0000` … `0004_call_sessions`.
 
-Map, then add only necessary migrations:
+## Deferred (not primary UX)
 
-- Users / provider profiles, roles, languages, topics, modes, price, availability, operator-only verification.
-- Recipient-specific shared context snapshots and revocation.
-- Request membership plus accept/decline actor.
-- Conversation membership, messages, pagination, idempotency keys, blocks.
-- Two Chairs remote membership and turn state.
-- Activities, invitations, private drafts vs published responses.
-- Circles, membership approval, facilitator authorisation, private membership.
-- Introduction card persistence.
-- Payment orders and verified webhook events.
+Circles / membership, counselor directory, clinical intake, sanctuary feed, payments, Django-backed auth. Optional Django schema lives under `backend/` and is separate from this D1 map.
 
-Until then, introduction cards, activities, conversation previews, provider drafts, circle membership, and blocks use explicitly labelled browser fixtures. They are not described as production functionality.
+Browser fixtures still hold activities, mood marks, and reflections locally until you choose to promote them.

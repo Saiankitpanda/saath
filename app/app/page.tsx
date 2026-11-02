@@ -7,24 +7,21 @@ import ArriveHome from "@/components/ArriveHome";
 import GettingToKnowYou from "@/components/GettingToKnowYou";
 import ActivitiesWorkspace from "@/components/ActivitiesWorkspace";
 import ConversationRoom from "@/components/ConversationRoom";
-import ProviderOnboarding from "@/components/ProviderOnboarding";
 import Enrollment from "@/components/Enrollment";
 import TwoChairsRoom from "@/components/TwoChairsRoom";
+import CallRoom from "@/components/CallRoom";
 import { api } from "@/lib/client/api";
+import type { PublicCall } from "@/lib/application/ports";
 import {
-  addCircleInterest,
   addMood,
   loadFixtures,
   saveInterests,
   saveReflections,
   toggleBlock,
 } from "@/lib/client/store";
-import { circleFixtures, samplePeople, staticWritingPrompts, topics } from "@/lib/fixtures";
+import { samplePeople, staticWritingPrompts, topics } from "@/lib/fixtures";
 import {
-  composeIntroduction,
-  FIXTURE_NOTICE,
   SAMPLE_PROFILE_NOTICE,
-  labelMood,
   type ActivityRecord,
   type ConversationRecord,
   type EncryptionStatus,
@@ -35,7 +32,6 @@ import {
   type MoodEntry,
   type MoodKind,
   type Person,
-  type ProviderDraft,
   type SessionRequest,
   type View,
 } from "@/lib/domain";
@@ -45,8 +41,6 @@ import {
   Armchair,
   BookOpen,
   Check,
-  ChevronLeft,
-  CircleHelp,
   Globe,
   Heart,
   Leaf,
@@ -64,9 +58,9 @@ import {
 type Message = { role: "user" | "assistant"; content: string };
 
 const paths = [
-  { view: "connect" as View, n: "01", icon: MessageCircle, title: "Someone to listen.", desc: "A peer listener or professional counsellor. You choose the pace and what to share.", label: "Meet someone" },
+  { view: "connect" as View, n: "01", icon: MessageCircle, title: "Someone to listen.", desc: "Pair with a real listener by code, or talk with a clearly fictional AI personality.", label: "Meet someone" },
   { view: "rehearsal" as View, n: "02", icon: Armchair, title: "A room to practise.", desc: "Practise what’s hard to say with a clearly fictional counterpart.", label: "Enter rehearsal room" },
-  { view: "circles" as View, n: "03", icon: Users, title: "A circle to belong.", desc: "Small shared-experience support. Speak, listen, or pass.", label: "Explore circles" },
+  { view: "chairs" as View, n: "03", icon: Users, title: "Two chairs.", desc: "Sit with someone after they join. Text first, then a voice call if you both want it.", label: "Open Two Chairs" },
 ];
 
 function App() {
@@ -84,9 +78,6 @@ function App() {
   const [topic, setTopic] = useState("Just need to talk");
   const [language, setLanguage] = useState("All languages");
   const [role, setRole] = useState("Everyone");
-  const [budget, setBudget] = useState("Any budget");
-  const [modeFilter, setModeFilter] = useState("Any mode");
-  const [availabilityFilter, setAvailabilityFilter] = useState("Any availability");
   const [support, setSupport] = useState("Listen only");
   const [context, setContext] = useState("");
   const [shareMode, setShareMode] = useState<"private" | "ask-first">("private");
@@ -94,7 +85,6 @@ function App() {
   const [requests, setRequests] = useState<SessionRequest[]>([]);
   const [selected, setSelected] = useState<Person | null>(null);
   const [consent, setConsent] = useState(false);
-  const [mode, setMode] = useState("Chat");
   const [busy, setBusy] = useState(false);
   const [scenario, setScenario] = useState("Setting a boundary");
   const [goal, setGoal] = useState("Say the first sentence clearly");
@@ -103,9 +93,6 @@ function App() {
   const [includeContext, setIncludeContext] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
-  const [circle, setCircle] = useState<string | null>(null);
-  const [circleInterest, setCircleInterest] = useState<string[]>([]);
-  const [circleMembership, setCircleMembership] = useState<Record<string, string>>({});
   const [modal, setModal] = useState<"approach" | "join" | "privacy" | "phrase" | null>(null);
   const [phrase, setPhrase] = useState("");
   const [phrasePerson, setPhrasePerson] = useState<Person | null>(null);
@@ -116,8 +103,8 @@ function App() {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [interests, setInterests] = useState<InterestId[]>([]);
   const [reflections, setReflections] = useState("");
-  const [providerDraft, setProviderDraft] = useState<ProviderDraft | null>(null);
   const [conversation, setConversation] = useState<ConversationRecord | null>(null);
+  const [activeCall, setActiveCall] = useState<PublicCall | null>(null);
   const [submitLock, setSubmitLock] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -130,9 +117,6 @@ function App() {
     setInterests(fixtures.interests);
     setReflections(fixtures.reflections || fixtures.quietThoughts);
     setBlocks(fixtures.blocks);
-    setProviderDraft(fixtures.providerDraft);
-    setCircleInterest(fixtures.circleInterest);
-    setCircleMembership(fixtures.circleMembership);
     setConversation(fixtures.conversations[0] ?? null);
   }, []);
 
@@ -140,12 +124,25 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const intended = params.get("enroll");
     if (intended === "client" || intended === "listener") setView("enroll");
-    if (params.get("view") === "chairs") setView("chairs");
-    api<{ authenticated: boolean; displayName?: string | null; aiConfigured: boolean; encryption?: EncryptionStatus; voiceConfigured?: boolean }>("/api/status").then(data => {
+    const requestedView = params.get("view");
+    if (requestedView === "circles" || requestedView === "onboard") {
+      setView(requestedView === "onboard" ? "enroll" : "connect");
+    } else if (
+      requestedView === "chairs" ||
+      requestedView === "connect" ||
+      requestedView === "arrive" ||
+      requestedView === "space" ||
+      requestedView === "activities" ||
+      requestedView === "rehearsal" ||
+      requestedView === "enroll"
+    ) {
+      setView(requestedView);
+    }
+    api<{ authenticated: boolean; displayName?: string | null; aiConfigured: boolean; encryption?: EncryptionStatus; voiceConfigured?: boolean; calling?: boolean }>("/api/status").then(data => {
       setAuth(data.authenticated);
       setDisplayName(data.displayName || "");
       setAi(data.aiConfigured);
-      setVoiceConfigured(Boolean(data.voiceConfigured));
+      setVoiceConfigured(Boolean(data.voiceConfigured || data.calling));
       if (data.encryption) setEncryption(data.encryption);
       if (data.authenticated) {
         api<{ context: { content: string; shareMode?: "private" | "ask-first" } | null }>("/api/context").then(result => {
@@ -183,13 +180,12 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!selected && !circle && !modal) return;
+    if (!selected && !modal) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setSelected(null);
-        setCircle(null);
         setModal(null);
       }
     };
@@ -198,10 +194,11 @@ function App() {
       document.body.style.overflow = previous;
       document.removeEventListener("keydown", close);
     };
-  }, [selected, circle, modal]);
+  }, [selected, modal]);
 
   function go(next: View) {
-    setView(next);
+    const resolved = next === "circles" ? "connect" : next === "onboard" ? "enroll" : next;
+    setView(resolved);
     setMobile(false);
     setNotice("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -220,6 +217,23 @@ function App() {
     go("connect");
     flash("A live person is reached only with a pairing code, and only after they accept. Saath does not invent availability.");
   }
+  async function startCall(requestId: string) {
+    setBusy(true);
+    try {
+      const result = await api<{ call: PublicCall }>("/api/calls", "POST", {
+        source: "request",
+        sourceId: requestId,
+        media: "voice",
+      });
+      setActiveCall(result.call);
+      flash("The call is ringing. The other person joins from their account. Your microphone stays off until you join.");
+    } catch (error) {
+      flash((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
 
   async function enroll(input: { clientEnrolled: boolean; listenerEnrolled: boolean; activeRole: EnrollmentRole; displayName: string }) {
     if (!auth) {
@@ -314,10 +328,6 @@ function App() {
       flash("You blocked this profile in this browser. Blocked people cannot receive a new request here.");
       return;
     }
-    if (mode !== "Chat") {
-      flash("Voice and video are not connected. Choose chat, or leave this request unsent.");
-      return;
-    }
     if (!auth) {
       flash("This is a sample profile. Sign in to explore saved requests; no real person will be contacted.");
       return;
@@ -390,10 +400,7 @@ function App() {
     !blocks.includes(person.id)
     && (language === "All languages" || person.languages.includes(language))
     && (role === "Everyone" || person.specialty === role)
-    && (budget !== "Free listeners" || person.price === 0)
     && (topic === "Just need to talk" || person.topics.includes(topic))
-    && (modeFilter === "Any mode" || person.modes.includes(modeFilter.toLowerCase() as Person["modes"][number]))
-    && (availabilityFilter !== "Actually available now" || person.actuallyAvailable)
   );
 
   const accepted = requests.filter(item => item.status === "accepted");
@@ -412,17 +419,13 @@ function App() {
       <header className="header">
         <button className="brand" onClick={() => go("home")} aria-label="Saath home"><span className="brand-mark"><i/><i/></span>saath<span className="brand-dot">.</span></button>
         <nav className={mobile ? "main-nav open" : "main-nav"} aria-label="Main navigation">
-          <button onClick={() => setModal("approach")}>Our approach</button>
           <button className={view === "arrive" ? "active" : ""} onClick={() => go("arrive")}>Your visit</button>
-          <button className={view === "connect" ? "active" : ""} onClick={() => go("connect")}>Someone to listen</button>
+          <button className={view === "connect" ? "active" : ""} onClick={() => go("connect")}>Listen</button>
           <button className={view === "rehearsal" ? "active" : ""} onClick={() => go("rehearsal")}>Practise</button>
-          <button className={view === "circles" ? "active" : ""} onClick={() => go("circles")}>Circles</button>
-          <button className={view === "activities" ? "active" : ""} onClick={() => go("activities")}>Activities</button>
+          <button className={view === "chairs" ? "active" : ""} onClick={() => go("chairs")}>Two chairs</button>
+          <button className={view === "space" ? "active" : ""} onClick={() => go("space")}>My space</button>
         </nav>
         <div className="header-actions">
-          <button className="quiet space-link" onClick={() => go("space")}>My space</button>
-          <button className="quiet space-link" onClick={() => go("chairs")}>Two chairs</button>
-          <button className="quiet space-link" onClick={() => ambient.openPanel()}>Quiet corner</button>
           {profile && (profile.clientEnrolled || profile.listenerEnrolled) ? (
             <div className="role-switch" role="group" aria-label="Active role">
               {profile.clientEnrolled && (
@@ -434,7 +437,7 @@ function App() {
             </div>
           ) : (
             <button className="button small" onClick={() => go("enroll")}>
-              {auth ? "Finish enrollment" : "Sign in"} <UserRound size={15}/>
+              {auth ? "Enroll" : "Sign in"} <UserRound size={15}/>
             </button>
           )}
           <button className="mobile-toggle" aria-label="Toggle navigation" aria-expanded={mobile} onClick={() => setMobile(!mobile)}>{mobile ? <X/> : <Menu/>}</button>
@@ -453,7 +456,7 @@ function App() {
                 <button className="button" onClick={() => go(profile ? "arrive" : "enroll")}>
                   {profile ? "Continue your visit" : "Enroll or sign in"} <ArrowRight size={18}/>
                 </button>
-                <button className="text-button" onClick={() => go("connect")}>Someone to listen</button>
+                <button className="text-button" onClick={() => go("connect")}>Listen</button>
               </div>
               <div className="language-note"><Globe size={14}/> English <span>·</span> हिन्दी <span>·</span> Hinglish</div>
               <div className="hero-footnote"><span className="tiny-flower">✳</span> Adults 18+. No perfect words needed.</div>
@@ -467,18 +470,18 @@ function App() {
             <svg className="thread" viewBox="0 0 400 120" aria-hidden="true"><path d="M0 95 C95 140 230 15 200 20 C150 28 195 120 400 0"/></svg>
           </section>
           <section className="topic-strip">
-            <div><span className="eyebrow">SHORTCUTS</span><h2>Your visit, My Space, activities, Two Chairs, Quiet Corner.</h2></div>
+            <div><span className="eyebrow">START HERE</span><h2>One path. Five places.</h2></div>
             <div className="topic-pills">
               <button onClick={() => go("arrive")}><span className="topic-icon tint-0"><Heart size={18}/></span>Your visit<ArrowUpRight className="pill-arrow" size={14}/></button>
-              <button onClick={() => go("space")}><span className="topic-icon tint-0"><BookOpen size={18}/></span>My Space<ArrowUpRight className="pill-arrow" size={14}/></button>
-              <button onClick={() => go("activities")}><span className="topic-icon tint-1"><Leaf size={18}/></span>Activities<ArrowUpRight className="pill-arrow" size={14}/></button>
-              <button onClick={() => go("chairs")}><span className="topic-icon tint-2"><Armchair size={18}/></span>Two Chairs<ArrowUpRight className="pill-arrow" size={14}/></button>
-              <button onClick={() => ambient.openPanel()}><span className="topic-icon tint-3"><CircleHelp size={18}/></span>Quiet Corner<ArrowUpRight className="pill-arrow" size={14}/></button>
+              <button onClick={() => go("connect")}><span className="topic-icon tint-1"><MessageCircle size={18}/></span>Listen<ArrowUpRight className="pill-arrow" size={14}/></button>
+              <button onClick={() => go("rehearsal")}><span className="topic-icon tint-2"><Sparkles size={18}/></span>Practise<ArrowUpRight className="pill-arrow" size={14}/></button>
+              <button onClick={() => go("chairs")}><span className="topic-icon tint-3"><Armchair size={18}/></span>Two chairs<ArrowUpRight className="pill-arrow" size={14}/></button>
+              <button onClick={() => go("space")}><span className="topic-icon tint-0"><BookOpen size={18}/></span>My space<ArrowUpRight className="pill-arrow" size={14}/></button>
             </div>
           </section>
           <section className="section pathways">
             <div className="section-head">
-              <div><div className="eyebrow">THREE WAYS IN</div><h2>A person, a practice room,<br/>or a circle.</h2></div>
+              <div><div className="eyebrow">THREE WAYS IN</div><h2>A person, a practice room,<br/>or two chairs.</h2></div>
               <p>Pick one to start.</p>
             </div>
             <div className="path-grid">
@@ -492,63 +495,9 @@ function App() {
               ))}
             </div>
           </section>
-          <section className="two-chair-feature">
-            <div className="chairs-illustration">
-              <img className="feature-photo" src="/assets/saath-rehearsal.png" alt="Two empty chairs in a quiet room"/>
-            </div>
-            <div>
-              <div className="eyebrow">THE TWO-CHAIR ROOM</div>
-              <h2>A hard conversation.<br/>A softer place to have it.</h2>
-              <p>Same-device guidance, private fictional rehearsal, or a mutually accepted remote conversation when both people have actually joined.</p>
-              <button className="text-button" onClick={() => go("chairs")}>Explore the room <ArrowRight size={18}/></button>
-            </div>
-            <span className="feature-tag">No recording by default.</span>
-          </section>
-          <section className="section support-section">
-            <div className="section-head">
-              <div><div className="eyebrow">WHO YOU CAN MEET</div><h2>A person if one is there.<br/>An AI personality if not.</h2></div>
-              <button className="text-button" onClick={() => go("connect")}>Explore your options <ArrowRight size={17}/></button>
-            </div>
-            <div className="support-grid">
-              <button onClick={askForPerson} className="support-card sage">
-                <div className="portrait abstract-one"><span>☺</span></div>
-                <div><span className="eyebrow">A LIVE PERSON</span><h3>Pair with someone</h3><p>A listener who has shared a code, and who accepts.<br/>Nobody is invented as available.</p></div>
-                <ArrowUpRight/>
-              </button>
-              <button onClick={() => go("connect")} className="support-card peach">
-                <div className="portrait abstract-two"><Leaf size={55} strokeWidth={1}/></div>
-                <div><span className="eyebrow">AI PERSONALITIES</span><h3>Specialised, fictional company</h3><p>Meera, Arjun, Isha, and Kabir are AI personalities with a domain. They cannot accept as people.</p></div>
-                <ArrowUpRight/>
-              </button>
-            </div>
-          </section>
-          <section className="gentle-banner">
-            <Leaf size={23} strokeWidth={1.2}/>
-            <h2>Find a listener when you want one.</h2>
-            <button className="button" onClick={() => go("connect")}>Let’s start with hello <ArrowRight size={18}/></button>
-          </section>
         </main>
       ) : (
         <main className="workspace">
-          <div className="workspace-top">
-            <button className="back-link" onClick={() => go("home")}><ChevronLeft size={16}/> Back to the courtyard</button>
-            <span className="preview-label">EARLY PREVIEW · 18+</span>
-          </div>
-          <div className="workspace-tabs" aria-label="Explore Saath">
-            {([
-              ["arrive", "Your visit"],
-              ["enroll", "Enroll"],
-              ["connect", "Find a person"],
-              ["circles", "Circles"],
-              ["rehearsal", "Rehearsal room"],
-              ["chairs", "Two chairs"],
-              ["activities", "Activities"],
-              ["space", "My space"],
-            ] as [View, string][]).map(([next, label]) => (
-              <button className={view === next ? "selected" : ""} key={next} onClick={() => go(next)}>{label}</button>
-            ))}
-          </div>
-
           {view === "enroll" && (
             <Enrollment
               auth={auth}
@@ -574,6 +523,15 @@ function App() {
               go={go}
               onTalkWithPersona={talkWithPersona}
               onAskForPerson={askForPerson}
+              onStartCall={startCall}
+            />
+          )}
+          {view === "arrive" && activeCall && (
+            <CallRoom
+              call={activeCall}
+              onChange={setActiveCall}
+              onEnded={() => setActiveCall(null)}
+              onNotice={flash}
             />
           )}
 
@@ -586,10 +544,6 @@ function App() {
               onSaved={(answers, completed) => { setIntro(answers); setIntroDone(completed); }}
               flash={flash}
             />
-          )}
-
-          {view === "onboard" && (
-            <ProviderOnboarding initial={providerDraft} onSaved={setProviderDraft} flash={flash}/>
           )}
 
           {view === "conversation" && conversation && (
@@ -658,13 +612,10 @@ function App() {
                   )) : <p className="small-print">No incoming requests yet.</p>}
                 </section>
               </div>
-              <div className="filter-bar filter-bar-wide">
+              <div className="filter-bar">
                 <label>What’s on your mind?<select value={topic} onChange={event => setTopic(event.target.value)}>{topics.map(item => <option key={item}>{item}</option>)}</select></label>
                 <label>Focus<select value={role} onChange={event => setRole(event.target.value)}>{["Everyone", "Company in hard conversations", "Pressure and next chapters", "Paced conversation", "Spiritual quiet"].map(item => <option key={item}>{item}</option>)}</select></label>
                 <label>Language<select value={language} onChange={event => setLanguage(event.target.value)}>{["All languages", "English", "Hindi", "Hinglish"].map(item => <option key={item}>{item}</option>)}</select></label>
-                <label>Budget<select value={budget} onChange={event => setBudget(event.target.value)}><option>Any budget</option><option>Free listeners</option></select></label>
-                <label>Mode<select value={modeFilter} onChange={event => setModeFilter(event.target.value)}><option>Any mode</option><option>Chat</option><option>Voice</option><option>Video</option></select></label>
-                <label>Availability<select value={availabilityFilter} onChange={event => setAvailabilityFilter(event.target.value)}><option>Any availability</option><option>Actually available now</option></select></label>
               </div>
               <div className="result-heading">
                 <p>{filtered.length} AI {filtered.length === 1 ? "personality" : "personalities"} to explore</p>
@@ -680,7 +631,7 @@ function App() {
                     <p>{person.intro}</p>
                     <div className="person-chips">{person.topics.map(item => <span key={item}>{item}</span>)}</div>
                     <div className="person-languages"><Globe size={14}/>{person.languages.join(" · ")}</div>
-                    <p className="small-print">{person.availabilityLabel}. Modes: {person.modes.join(", ")}. Voice/video not connected.</p>
+                    <p className="small-print">{person.availabilityLabel}. Chat rehearsal only — not a live person.</p>
                     <div className="person-bottom">
                       <span>Chat<small> · fictional · not a live session</small></span>
                       <button className="round-button" aria-label={"Talk with " + person.name} onClick={() => { setSelected(person); setConsent(false); }}><ArrowUpRight size={20}/></button>
@@ -693,45 +644,9 @@ function App() {
                   <Leaf/>
                   <h2>No matching AI personalities.</h2>
                   <p>No AI personalities match these filters. Nobody is actually available as a live participant.</p>
-                  <button className="button" onClick={() => { setTopic("Just need to talk"); setRole("Everyone"); setLanguage("All languages"); setBudget("Any budget"); setModeFilter("Any mode"); setAvailabilityFilter("Any availability"); }}>Reset filters</button>
+                  <button className="button" onClick={() => { setTopic("Just need to talk"); setRole("Everyone"); setLanguage("All languages"); }}>Reset filters</button>
                 </div>
               )}
-            </>
-          )}
-
-          {view === "circles" && (
-            <>
-              <div className="page-heading">
-                <div className="eyebrow">CIRCLES</div>
-                <h1>Shared-experience groups.<br/><em>Not open yet.</em></h1>
-                <p>Shared-experience support, not trauma bonding. You can speak, listen, or pass.</p>
-              </div>
-              <div className="sample-notice"><Users size={17}/> Circle concepts and example schedules. Registration and live group conversations are not open yet.</div>
-              <img className="feature-photo circles-photo" src="/assets/saath-circles.png" alt="A small circle of empty chairs in a quiet courtyard"/>
-              <div className="circle-grid">
-                {circleFixtures.map(item => (
-                  <article key={item.id} className="circle-card sage">
-                    <Users size={37} strokeWidth={1.1}/>
-                    <span className="eyebrow">{item.topic}</span>
-                    <h2>{item.name}</h2>
-                    <p>{item.description}</p>
-                    <div className="circle-meta">
-                      <Users size={15}/> Capacity {item.capacity} · {item.language}
-                      <span>{item.schedule} · {item.timezone}</span>
-                      <span>Facilitator: {item.facilitator}</span>
-                      <span>Status: planned / exploration — not currently operating</span>
-                    </div>
-                    <button className="outline-button" onClick={() => setCircle(item.id)}>Explore this circle <ArrowRight size={17}/></button>
-                  </article>
-                ))}
-              </div>
-              <div className="room-rules">
-                <ShieldCheck size={27}/>
-                <div>
-                  <h3>A circle works when everyone has room.</h3>
-                  <p>Restricted content will require approved membership. Facilitator actions will require authorisation. Membership is not shown publicly by default.</p>
-                </div>
-              </div>
             </>
           )}
 
@@ -807,29 +722,23 @@ function App() {
             <>
               <div className="page-heading">
                 <div className="eyebrow">MY SPACE</div>
-                <h1>Your story.<br/><em>On your terms.</em></h1>
-                <p>Private context, your introduction, activities, requests, and optional reflections.</p>
+                <h1>Your notes.<br/><em>Your requests.</em></h1>
+                <p>Save private context, review pairing requests, and start a call after someone accepts.</p>
               </div>
-              {!auth && <div className="sample-notice"><ShieldCheck size={18}/><span>Your writing stays in this tab until you leave. <a href="/signin-with-chatgpt?return_to=/">Sign in to save your context.</a></span></div>}
-              {encryption && (
+              {!auth && (
                 <div className="sample-notice">
                   <ShieldCheck size={18}/>
-                  <span>
-                    {encryption.atRest ? "At-rest encryption is on for private context and request notes (AES-256-GCM). " : "At-rest encryption is not configured. "}
-                    End-to-end encryption is not claimed. {encryption.detail}
-                  </span>
+                  <span>Sign in to save context on the server. <a href="/signin-with-chatgpt?return_to=/?view=space">Sign in</a></span>
                 </div>
               )}
-              {auth && !introDone && (
-                <div className="sample-notice">
-                  Optional: Getting to Know You. <button className="text-button" onClick={() => go("intro")}>Begin or resume</button>
-                </div>
+              {encryption?.atRest && (
+                <p className="small-print space-encrypt-note">At-rest encryption is on for saved context. End-to-end encryption is not claimed.</p>
               )}
-              <div className="two-column">
+              <div className="two-column space-layout">
                 <section className="plain-panel context-panel">
                   <BookOpen size={25} strokeWidth={1.4}/>
                   <h2>Private context</h2>
-                  <p>A little context about your life. Share as much or as little as you choose.</p>
+                  <p>What you want a listener to know — only when you choose to share it.</p>
                   <label htmlFor="life-context">My context</label>
                   <textarea id="life-context" value={context} onChange={event => setContext(event.target.value)} maxLength={4000} placeholder="Lately, I’ve been…"/>
                   <span className="field-count">{context.length}/4000</span>
@@ -840,7 +749,7 @@ function App() {
                     </select>
                   </label>
                   <div className="inline-actions">
-                    <button className="button" disabled={busy} onClick={saveContext}>{busy ? "Saving…" : "Save my context"}<Check size={16}/></button>
+                    <button className="button" disabled={busy} onClick={saveContext}>{busy ? "Saving…" : "Save"}<Check size={16}/></button>
                     <button className="text-button" onClick={async () => {
                       if (auth) {
                         try { await api("/api/context", "DELETE"); setContext(""); flash("Your saved context was deleted."); }
@@ -848,62 +757,55 @@ function App() {
                       } else setContext("");
                     }}>Delete</button>
                   </div>
-                  <div className="privacy-note"><ShieldCheck size={16}/> Previously viewed snapshots cannot be recalled from someone else’s memory. Deletion removes the current saved copy.</div>
                 </section>
-                <section className="plain-panel">
-                  <h2>Introduction card</h2>
-                  <p>Private by default. Built from your answers only.</p>
-                  <pre className="intro-preview">{intro ? composeIntroduction(intro) : "No introduction yet."}</pre>
-                  <button className="text-button" onClick={() => go("intro")}>{intro ? "Edit introduction" : "Start Getting to Know You"}</button>
-                </section>
-              </div>
-              <div className="two-column">
                 <section className="plain-panel">
                   <MessageCircle size={25} strokeWidth={1.4}/>
-                  <h2>Connection requests</h2>
-                  <p>A saved request is not a delivered invitation or established connection.</p>
+                  <h2>Requests</h2>
+                  <p>Pending and accepted pairing. Samples cannot accept.</p>
                   {requests.length ? requests.map(item => (
                     <div className="request-row" key={item.id}>
-                      <div><strong>{item.providerName}</strong><span>{item.topic} · {item.mode} · {item.status}</span></div>
+                      <div>
+                        <strong>{item.providerName}</strong>
+                        <span>{item.topic} · {item.status}</span>
+                      </div>
                       {item.status === "pending" && (
                         <button className="quiet" onClick={async () => {
                           try {
                             const result = await api<{ request: SessionRequest }>("/api/requests", "PATCH", { id: item.id, action: "cancel" });
                             setRequests(current => current.map(entry => entry.id === item.id ? result.request : entry));
-                            flash("Request cancelled. Nobody was connected.");
+                            flash("Request cancelled.");
                           } catch (error) { flash((error as Error).message); }
                         }}>Cancel</button>
+                      )}
+                      {item.status === "accepted" && (
+                        <button className="quiet" type="button" disabled={busy} onClick={() => void startCall(item.id)}>Call</button>
                       )}
                       <span className="status-badge">{item.status}</span>
                     </div>
                   )) : (
-                    <div className="small-empty"><Leaf size={30} strokeWidth={1}/><h3>A hello can happen whenever you’re ready.</h3><button className="text-button" onClick={() => go("connect")}>Explore AI personalities or pair a person <ArrowRight size={16}/></button></div>
+                    <div className="small-empty">
+                      <h3>No requests yet.</h3>
+                      <button className="text-button" onClick={() => go("connect")}>Go to Listen <ArrowRight size={16}/></button>
+                    </div>
                   )}
-                </section>
-                <section className="plain-panel">
-                  <h2>Accepted conversations</h2>
-                  <p>Only accepted, participant-authorised conversations can open. Sample profiles cannot accept.</p>
-                  {accepted.length ? accepted.map(item => <div className="request-row" key={item.id}><strong>{item.providerName}</strong><span>Accepted</span></div>) : <p className="small-print">No accepted connections yet.</p>}
-                  {conversation && (
-                    <button className="text-button" onClick={() => go("conversation")}>Open development fixture conversation</button>
+                  {activeCall && (
+                    <CallRoom
+                      call={activeCall}
+                      onChange={setActiveCall}
+                      onEnded={() => setActiveCall(null)}
+                      onNotice={flash}
+                    />
                   )}
-                  <p className="small-print">{FIXTURE_NOTICE}</p>
-                  <button className="text-button" onClick={() => go("activities")}>Open activities</button>
-                  <button className="text-button" onClick={() => go("onboard")}>Provider onboarding draft</button>
+                  <div className="inline-actions space-quick-links">
+                    <button className="text-button" onClick={() => go("chairs")}>Open Two chairs</button>
+                    <button className="text-button" onClick={() => go("intro")}>{introDone || intro ? "Edit introduction" : "Getting to Know You"}</button>
+                  </div>
                 </section>
               </div>
               <section className="plain-panel">
-                <h2>Moods you have marked</h2>
-                <p>From Your visit. Not a diagnosis.</p>
-                {moods.length ? moods.slice(0, 8).map(item => (
-                  <div className="request-row" key={item.id}><strong>{labelMood(item.mood)}</strong><span>{new Date(item.createdAt).toLocaleString()}</span></div>
-                )) : <p className="small-print">No mood marked yet.</p>}
-                <button className="text-button" onClick={() => go("arrive")}>Mark a mood</button>
-              </section>
-              <section className="plain-panel">
-                <h2>Optional private reflections</h2>
-                <textarea value={reflections} onChange={event => { setReflections(event.target.value); saveReflections(event.target.value); }} maxLength={4000} placeholder="Notes that stay with you…"/>
-                <p className="small-print">{FIXTURE_NOTICE} Quiet corner thoughts are saved in the same browser store.</p>
+                <h2>Private notes</h2>
+                <p>Stays in this browser. Not sent to a listener unless you paste it into context.</p>
+                <textarea value={reflections} onChange={event => { setReflections(event.target.value); saveReflections(event.target.value); }} maxLength={4000} placeholder="Notes for yourself…"/>
               </section>
             </>
           )}
@@ -915,8 +817,9 @@ function App() {
           <button className="brand" onClick={() => go("home")}><span className="brand-mark"><i/><i/></span>saath<span className="brand-dot">.</span></button>
           <span className="footer-tagline">Someone alongside you.</span>
           <div>
-            <button onClick={() => go("enroll")}>Enroll as client or listener</button>
-            <button onClick={() => setModal("privacy")}>Privacy & boundaries</button>
+            <button onClick={() => setModal("approach")}>Our approach</button>
+            <button onClick={() => go("enroll")}>Enroll</button>
+            <button onClick={() => setModal("privacy")}>Privacy</button>
           </div>
         </div>
         <div className="footer-bottom">
@@ -925,63 +828,34 @@ function App() {
         </div>
       </footer>
 
-      {(selected || circle || modal) && (
-        <div className="modal-backdrop" onClick={() => { setSelected(null); setCircle(null); setModal(null); }}>
+      {(selected || modal) && (
+        <div className="modal-backdrop" onClick={() => { setSelected(null); setModal(null); }}>
           <section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={event => event.stopPropagation()}>
-            <button className="modal-close" aria-label="Close dialog" onClick={() => { setSelected(null); setCircle(null); setModal(null); }}><X size={20}/></button>
+            <button className="modal-close" aria-label="Close dialog" onClick={() => { setSelected(null); setModal(null); }}><X size={20}/></button>
             {selected && (
               <>
                 <div className="eyebrow">FICTIONAL AI PERSONALITY</div>
                 <h2 id="modal-title">{selected.name} · {selected.specialty}</h2>
                 <p>{SAMPLE_PROFILE_NOTICE} Domain: {selected.domain}.</p>
-                <p className="small-print">Talking here opens rehearsal with this personality. It cannot accept a live request. If you want a person, use a pairing code.</p>
+                <p className="small-print">Talking here opens rehearsal with this personality. It cannot accept a live request. If you want a person, use a pairing code. Voice calls are for accepted live listeners via Two Chairs, not AI personalities.</p>
                 <label>How would you like to be supported?<select value={support} onChange={event => setSupport(event.target.value)}><option>Listen only</option><option>Help me reflect</option><option>Offer suggestions</option></select></label>
-                <label>Conversation mode<select value={mode} onChange={event => setMode(event.target.value)}><option>Chat</option><option>Voice</option><option>Video</option></select></label>
-                {mode !== "Chat" && <p className="small-print">Voice and video are disabled. A room provider is not configured, and camera or microphone permission is not requested here.</p>}
+                <p className="small-print">Conversation mode: chat only for AI personalities.</p>
                 <label>Context to include<textarea value={context} onChange={event => setContext(event.target.value)} maxLength={4000} placeholder="Only what you want this personality to hear…"/></label>
                 <button className="button full" onClick={() => talkWithPersona(selected)}>Talk with {selected.name}<ArrowRight size={17}/></button>
                 <button className="outline-button" onClick={() => { setSelected(null); askForPerson(); }}>I’d rather talk with a person</button>
                 <label className="checkbox-label"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)}/> I understand this is a sample request only, not a live person.</label>
-                <button className="quiet" disabled={!consent || busy || mode !== "Chat"} onClick={requestPerson}>{busy ? "Saving…" : "Save a sample request anyway"}</button>
+                <button className="quiet" disabled={!consent || busy} onClick={requestPerson}>{busy ? "Saving…" : "Save a sample request anyway"}</button>
                 <button className="quiet" onClick={() => setBlocks(toggleBlock(selected.id))}>{blocks.includes(selected.id) ? "Unblock in this browser" : "Block in this browser"}</button>
                 {!auth && <a className="sign-in-link" href="/signin-with-chatgpt?return_to=/">Sign in to save requests</a>}
               </>
             )}
-            {circle && (() => {
-              const item = circleFixtures.find(entry => entry.id === circle);
-              if (!item) return null;
-              const membership = circleMembership[item.id] || "none";
-              return (
-                <>
-                  <div className="eyebrow">A SAATH CIRCLE</div>
-                  <h2 id="modal-title">{item.name}</h2>
-                  <p>{item.description}</p>
-                  <ul className="simple-list">
-                    {item.guidelines.map(rule => <li key={rule}><Check size={16}/> {rule}</li>)}
-                  </ul>
-                  <div className="sample-notice">This circle is a concept. It is not currently operating. Restricted posts would require approved membership.</div>
-                  <button className="button full" onClick={() => {
-                    const next = { ...circleMembership, [item.id]: membership === "requested" ? "requested" : "requested" };
-                    setCircleMembership(next);
-                    setCircleInterest(addCircleInterest(item.name));
-                    flash("Membership request stored in this browser fixture. No live group was joined.");
-                    setCircle(null);
-                  }}>{membership === "requested" ? "Request already recorded" : "Request membership"}<Heart size={16}/></button>
-                  <button className="quiet" onClick={() => {
-                    setCircleMembership({ ...circleMembership, [item.id]: "left" });
-                    flash("You left this exploration. Membership was never public.");
-                    setCircle(null);
-                  }}>Leave</button>
-                </>
-              );
-            })()}
             {modal === "approach" && (
               <>
                 <div className="eyebrow">A LITTLE SUPPORT. A LITTLE SAATH.</div>
                 <h2 id="modal-title">You set the pace.</h2>
-                <div className="approach-step"><span>01</span><div><h3>Start with what you need.</h3><p>A listener, professional support, or space to practise a conversation.</p></div></div>
+                <div className="approach-step"><span>01</span><div><h3>Start with what you need.</h3><p>A live listener by pairing code, a fictional AI personality, or a room to practise.</p></div></div>
                 <div className="approach-step"><span>02</span><div><h3>Choose what to share.</h3><p>Your context is yours. Review it before any connection request.</p></div></div>
-                <div className="approach-step"><span>03</span><div><h3>Make room to be heard.</h3><p>Talk at your pace. Pause, leave, or change your mind whenever you need.</p></div></div>
+                <div className="approach-step"><span>03</span><div><h3>Make room to be heard.</h3><p>Talk at your pace. After a person accepts, you can sit in Two Chairs and start a browser voice call if you both want it.</p></div></div>
                 <button className="button full" onClick={() => { setModal(null); go("connect"); }}>Explore Saath <ArrowRight size={17}/></button>
               </>
             )}
@@ -989,18 +863,18 @@ function App() {
               <>
                 <div className="eyebrow">CLEAR BOUNDARIES</div>
                 <h2 id="modal-title">Your story belongs to you.</h2>
-                <p>Sample people and circles are fictional. Unsaved writing stays in this tab. Signed-in context and example requests are stored on the server and access is limited to their owner.</p>
-                <p>AI rehearsal only sends text after you opt in. That text is processed by the configured external AI provider. There is no recording, voice calling, or end-to-end encryption claim in this preview.</p>
-                <p>You can delete your context in My space. Previously viewed content cannot be unremembered by a person who already saw it. Live messaging, moderation, participant sharing, and professional verification still need the forthcoming schema and operating process.</p>
+                <p>AI personalities are fictional. Unsaved writing stays in this tab. Signed-in context and requests are stored on Vinext/D1 and access is limited to their owner. Context can be encrypted at rest when configured — that is not end-to-end encryption.</p>
+                <p>AI rehearsal only sends text after you opt in. Browser voice calling exists between two enrolled people after a request is accepted (Two Chairs / calls API). There is no call recording, and end-to-end encryption is not claimed.</p>
+                <p>You can delete your context in My space. Previously viewed content cannot be unremembered by a person who already saw it.</p>
                 <button className="button full" onClick={() => { setModal(null); go("space"); }}>Manage my context <ArrowRight size={17}/></button>
               </>
             )}
             {modal === "join" && (
               <>
-                <div className="eyebrow">LISTENER DRAFT</div>
-                <h2 id="modal-title">Listener onboarding is a draft.</h2>
-                <p>Listener onboarding is a draft only. Applications are not open as a live directory.</p>
-                <button className="button full" onClick={() => { setModal(null); go("onboard"); }}>Open the onboarding draft <ArrowRight size={17}/></button>
+                <div className="eyebrow">LISTEN AS A PERSON</div>
+                <h2 id="modal-title">Enroll as a listener.</h2>
+                <p>Listener enrollment gives you a pairing code. There is no paid counselor directory on this minimal path.</p>
+                <button className="button full" onClick={() => { setModal(null); go("enroll"); }}>Open enrollment <ArrowRight size={17}/></button>
               </>
             )}
             {modal === "phrase" && (

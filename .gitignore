@@ -23,3 +23,10 @@ app/*.pem
 # Original download packs — source is already in app/ and docs/
 archives/*.zip
 .git-app-backup/
+
+# Django microservice
+backend/.venv/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/db.sqlite3
+_bhargavotn-Saath/

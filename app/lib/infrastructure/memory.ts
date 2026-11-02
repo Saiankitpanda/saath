@@ -1,4 +1,7 @@
 import type {
+  CallRecord,
+  CallRepository,
+  CallSource,
   ChairRecord,
   ChairRepository,
   ContextRecord,
@@ -127,6 +130,39 @@ export class MemoryChairRepository implements ChairRepository {
   }
 
   async save(record: ChairRecord) {
+    const index = this.rows.findIndex(row => row.id === record.id);
+    if (index >= 0) this.rows[index] = record;
+    return record;
+  }
+}
+
+export class MemoryCallRepository implements CallRepository {
+  private readonly rows: CallRecord[] = [];
+
+  async findById(id: string) {
+    return this.rows.find(row => row.id === id) ?? null;
+  }
+
+  async findByCode(code: string) {
+    return this.rows.find(row => row.code === code) ?? null;
+  }
+
+  async findOpenBySource(source: CallSource, sourceId: string) {
+    return this.rows.find(row => row.source === source && row.sourceId === sourceId && row.status !== 'ended') ?? null;
+  }
+
+  async listByMember(ownerId: OwnerId) {
+    return this.rows
+      .filter(row => row.hostId === ownerId || row.guestId === ownerId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  async create(record: CallRecord) {
+    this.rows.push(record);
+    return record;
+  }
+
+  async save(record: CallRecord) {
     const index = this.rows.findIndex(row => row.id === record.id);
     if (index >= 0) this.rows[index] = record;
     return record;

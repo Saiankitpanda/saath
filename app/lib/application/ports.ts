@@ -143,3 +143,55 @@ export interface ChairRepository {
   create(record: ChairRecord): Promise<ChairRecord>;
   save(record: ChairRecord): Promise<ChairRecord>;
 }
+
+export type CallSource = 'chair' | 'request';
+export type CallStatus = 'ringing' | 'active' | 'ended';
+export type CallProvider = 'webrtc' | 'livekit';
+export type CallMedia = 'voice' | 'video';
+export type IceCandidate = { candidate: string; sdpMid?: string | null; sdpMLineIndex?: number | null };
+
+export type CallRecord = {
+  id: string;
+  code: string;
+  hostId: OwnerId;
+  guestId: string;
+  hostName: string;
+  guestName: string;
+  source: CallSource;
+  sourceId: string;
+  status: CallStatus;
+  provider: CallProvider;
+  media: CallMedia;
+  hostSdp: string;
+  guestSdp: string;
+  hostIce: IceCandidate[];
+  guestIce: IceCandidate[];
+  livekitRoom: string;
+  updatedAt: string;
+};
+
+export type PublicCall = {
+  id: string;
+  code: string;
+  status: CallStatus;
+  provider: CallProvider;
+  media: CallMedia;
+  you: 'host' | 'guest';
+  hostName: string;
+  guestName: string;
+  peerJoined: boolean;
+  offer: string;
+  answer: string;
+  remoteIce: IceCandidate[];
+  livekit: { url: string; token: string; room: string } | null;
+  recording: false;
+};
+
+export interface CallRepository {
+  findById(id: string): Promise<CallRecord | null>;
+  findByCode(code: string): Promise<CallRecord | null>;
+  findOpenBySource(source: CallSource, sourceId: string): Promise<CallRecord | null>;
+  listByMember(ownerId: OwnerId): Promise<CallRecord[]>;
+  create(record: CallRecord): Promise<CallRecord>;
+  save(record: CallRecord): Promise<CallRecord>;
+}

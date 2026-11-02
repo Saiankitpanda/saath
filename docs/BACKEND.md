@@ -20,7 +20,10 @@ This first vertical slice uses Vinext route handlers, Cloudflare D1, and the sta
 - `GET /api/chairs`: `{sessions}` for the signed-in member, or `{session}` when `?id=` is set.
 - `POST /api/chairs`: `{mode:"same-device"|"ai"|"paired",displayName?,pairingCode?}` opens a room. Paired rooms stay waiting until the other person joins.
 - `POST /api/chairs/join`: `{code,displayName?}`. Presence is recorded only after this succeeds.
-- `PATCH /api/chairs`: `{id,action:"start"|"next"|"pause"|"resume"|"leave"|"note"|"ai-turn"|"call",note?,message?}`. `call` returns 409 until a real LiveKit room exists. `ai-turn` uses the fictional rehearsal model on Person B steps only.
+- `PATCH /api/chairs`: `{id,action:"start"|"next"|"pause"|"resume"|"leave"|"note"|"ai-turn"|"call",note?,message?}`. `call` starts a voice call only for a paired room after the other person exists. Same-device and AI chairs stay on text.
+- `GET /api/calls`: `{calls}` or `{call}` when `?id=` is set.
+- `POST /api/calls`: `{source:"chair"|"request",sourceId,media:"voice"|"video"}`. Creates a ringing call for two real accounts. Sample/AI personalities cannot be called.
+- `PATCH /api/calls`: `{id,action:"join"|"offer"|"answer"|"ice"|"hangup",sdp?,candidate?}`. Browser WebRTC signaling, or LiveKit tokens when `LIVEKIT_*` are set. Saath does not record the call.
 
 All data endpoints require authentication. Mutations enforce same-origin requests. Inputs have size bounds and validation. Responses disable caching. Internal database and upstream errors are not disclosed to clients. Application code does not log sensitive content.
 
@@ -40,4 +43,4 @@ Provider identity and qualification verification; invitation acceptance and part
 
 ## Validation
 
-`node --experimental-strip-types --test lib/server/validation.test.mjs lib/server/lifecycle.test.mjs lib/application/request-service.test.mjs lib/application/chair-service.test.mjs` covers validation, request pairing, encryption, enrollment, rehearsal limits, Two Chairs join rules, AI-chair gating, and encrypted chair notes. `npx tsc --noEmit` should pass. Live voice remains untested because LIVEKIT values are unset. Live AI replies remain untested until provider credentials are configured.
+`node --experimental-strip-types --test lib/server/validation.test.mjs lib/server/lifecycle.test.mjs lib/application/request-service.test.mjs lib/application/chair-service.test.mjs lib/application/call-service.test.mjs` covers validation, request pairing, encryption, enrollment, rehearsal limits, Two Chairs join rules, call membership, and encrypted chair notes. `npx tsc --noEmit` should pass. With `pnpm dev` running, `node scripts/smoke-minimal.mjs` hits status, enroll, paired chair, call gate, and context CRUD. See `docs/MINIMAL_CRUD.md` for the AnkitContribution keep list. LiveKit-backed rooms remain untested until LIVEKIT values exist. Live AI replies remain untested until provider credentials are configured.

@@ -7,8 +7,10 @@ import type {
   FieldCipher,
   OwnerId,
   ProfileRepository,
+  PublicCall,
   PublicChair,
 } from './ports.ts';
+import { CallService } from './call-service.ts';
 import { RehearsalService } from './rehearsal-service.ts';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -43,6 +45,7 @@ export class ChairService {
   private readonly random: () => number;
   private readonly createId: () => string;
   private readonly voiceAvailable: boolean;
+  private readonly calls: CallService | null;
 
   constructor(
     chairs: ChairRepository,
@@ -53,6 +56,7 @@ export class ChairService {
     random: () => number = Math.random,
     createId: () => string = () => crypto.randomUUID(),
     voiceAvailable = false,
+    calls: CallService | null = null,
   ) {
     this.chairs = chairs;
     this.cipher = cipher;
@@ -62,6 +66,7 @@ export class ChairService {
     this.random = random;
     this.createId = createId;
     this.voiceAvailable = voiceAvailable;
+    this.calls = calls;
   }
 
   async list(ownerId: OwnerId): Promise<{ sessions: PublicChair[] }> {
@@ -129,16 +134,12 @@ export class ChairService {
   async act(
     ownerId: OwnerId,
     input: { id: string; action: ChairAction; note?: string; message?: string },
-  ): Promise<{ session: PublicChair }> {
+  ): Promise<{ session: PublicChair; call?: PublicCall }> {
     const row = await this.requireMember(ownerId, input.id);
     if (input.action === 'call') {
-      throw new AppError(
-        409,
-        this.voiceAvailable
-          ? 'LIVEKIT environment values are present, but a voice room is not implemented yet. Stay with the text turns.'
-          : 'Voice calling is not connected. LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET are unset. Use the text turns here.',
-        'VOICE_UNAVAILABLE',
-      );
+      if (!this.calls) throw new AppError(409, 'Calling is not available on this server.', 'VOICE_UNAVAILABLE');
+      const started = await this.calls.startFromChair(ownerId, row);
+      return { session: await this.present(row, ownerId), call: started.call };
     }
     if (row.status === 'closed' && input.action !== 'leave') {
       throw new AppError(409, 'This Two Chairs room is closed.');
