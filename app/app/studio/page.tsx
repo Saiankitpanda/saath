@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AmbientProvider } from '@/components/AmbientSound';
 import './studio.css';
-const assets=[['saath-garden-hero.png','The courtyard','Homepage and quiet-mode background'],['saath-rehearsal.png','Room for words','Rehearsal and Two Chairs introduction'],['saath-circles.png','Room for everyone','Circles discovery and empty states']];
+const assets=[['saath-garden-hero.png','The courtyard','Homepage and quiet-mode background'],['saath-two-chairs.jpg','Two chairs conversation','Two Chairs and Practise introduction'],['saath-circles.png','Room for everyone','Circles discovery and empty states']];
 const scripts={English:'Take your time. You can start wherever you feel comfortable. Would you like me to listen, or help you find the words?',Hindi:'आप आराम से अपनी बात कह सकते हैं। क्या आप चाहते हैं कि मैं सिर्फ सुनूँ, या अपनी बात कहने में आपकी मदद करूँ?',Hinglish:'Aap apna time lo. Jo comfortable lage, wahin se shuru karo. Main bas sunoon, ya words dhoondhne mein help karoon?'};
 export default function Studio(){
  const [voices,setVoices]=useState<SpeechSynthesisVoice[]>([]),[voice,setVoice]=useState(''),[language,setLanguage]=useState<keyof typeof scripts>('English'),[rate,setRate]=useState(0.9),[message,setMessage]=useState(''),[speaking,setSpeaking]=useState(false),[mic,setMic]=useState(false),[level,setLevel]=useState(0),[choice,setChoice]=useState(''),[notes,setNotes]=useState('');

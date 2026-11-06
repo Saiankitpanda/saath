@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight, Ear, HeartHandshake, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
-import type { EnrollmentProfile, EnrollmentRole } from '@/lib/domain';
+import { ROLE_LABELS, type EnrollmentProfile, type EnrollmentRole } from '@/lib/domain';
 
 type Props = {
   auth: boolean;
@@ -13,14 +13,16 @@ type Props = {
 
 export default function Enrollment({ auth, displayName, profile, busy, onEnroll }: Props) {
   const enrolled = Boolean(profile?.clientEnrolled || profile?.listenerEnrolled);
+  const seeker = ROLE_LABELS.client;
+  const companion = ROLE_LABELS.listener;
 
   return (
     <>
       <div className="page-heading">
-        <div className="eyebrow">CLIENT OR LISTENER. SAME ACCOUNT.</div>
+        <div className="eyebrow">SEEKER OR COMPANION. SAME ACCOUNT.</div>
         <h1>One ChatGPT sign-in.<br/><em>Two ways to show up.</em></h1>
         <p>
-          Enroll as a client, a listener, or both on the same identity. No second password.
+          Enroll as a {seeker.short}, a {companion.short}, or both on the same identity. No second password.
           After enroll you can talk with an AI companion by voice or DM, or ask a stranger for voice or chat — only when both people accept.
         </p>
       </div>
@@ -34,9 +36,9 @@ export default function Enrollment({ auth, displayName, profile, busy, onEnroll 
         <article className="enroll-card client">
           <div className="enroll-card-top">
             <span className="enroll-icon client-icon"><HeartHandshake size={26} strokeWidth={1.4}/></span>
-            <span className="eyebrow">CLIENT</span>
+            <span className="eyebrow">{seeker.short.toUpperCase()}</span>
           </div>
-          <h2>I am looking for a listener.</h2>
+          <h2>{seeker.long}</h2>
           <p>Express yourself first. Save private context, then meet a stranger or an AI companion when you are ready.</p>
           <ul className="simple-list">
             <li>Private notes can be encrypted at rest when configured.</li>
@@ -54,24 +56,24 @@ export default function Enrollment({ auth, displayName, profile, busy, onEnroll 
               activeRole: 'client',
               displayName,
             })}>
-              {profile?.clientEnrolled ? 'Enrolled as a client' : 'Enroll as a client'}
+              {profile?.clientEnrolled ? `Enrolled as ${seeker.short}` : `Enroll as ${seeker.short}`}
               <ArrowRight size={16}/>
             </button>
           ) : (
-            <a className="button full" href="/signin-with-chatgpt?return_to=/?enroll=client">Enroll as a client <ArrowRight size={16}/></a>
+            <a className="button full" href="/signin-with-chatgpt?return_to=/?enroll=client">Enroll as {seeker.short} <ArrowRight size={16}/></a>
           )}
         </article>
         <article className="enroll-card listener">
           <div className="enroll-card-top">
             <span className="enroll-icon listener-icon"><Ear size={26} strokeWidth={1.4}/></span>
-            <span className="eyebrow">LISTENER</span>
+            <span className="eyebrow">{companion.short.toUpperCase()}</span>
           </div>
-          <h2>I can sit with someone.</h2>
+          <h2>{companion.long}</h2>
           <p>Be available for a stranger who asks. Accept only when you can stay. Enrollment is not a credential.</p>
           <ul className="simple-list">
             <li>You get an invite code to share when you want to be found.</li>
             <li>Accept or decline each request yourself — voice or chat.</li>
-            <li>A listener is not a therapist or a verified counsellor.</li>
+            <li>A {companion.short} is not a therapist or a verified counsellor.</li>
           </ul>
           <div className="enroll-modes" aria-hidden="true">
             <span><Phone size={14}/> Voice</span>
@@ -84,11 +86,11 @@ export default function Enrollment({ auth, displayName, profile, busy, onEnroll 
               activeRole: 'listener',
               displayName,
             })}>
-              {profile?.listenerEnrolled ? 'Enrolled as a listener' : 'Enroll as a listener'}
+              {profile?.listenerEnrolled ? `Enrolled as ${companion.short}` : `Enroll as ${companion.short}`}
               <ArrowRight size={16}/>
             </button>
           ) : (
-            <a className="button full" href="/signin-with-chatgpt?return_to=/?enroll=listener">Enroll as a listener <ArrowRight size={16}/></a>
+            <a className="button full" href="/signin-with-chatgpt?return_to=/?enroll=listener">Enroll as {companion.short} <ArrowRight size={16}/></a>
           )}
         </article>
       </div>
@@ -97,10 +99,10 @@ export default function Enrollment({ auth, displayName, profile, busy, onEnroll 
           <h2>Saved on this account</h2>
           <p>
             {profile?.displayName || 'You'} ·
-            {profile?.clientEnrolled ? ' client' : ''}
+            {profile?.clientEnrolled ? ` ${seeker.short}` : ''}
             {profile?.clientEnrolled && profile?.listenerEnrolled ? ' and' : ''}
-            {profile?.listenerEnrolled ? ' listener' : ''}
-            {profile?.activeRole ? ` · using ${profile.activeRole} now` : ''}
+            {profile?.listenerEnrolled ? ` ${companion.short}` : ''}
+            {profile?.activeRole ? ` · using ${ROLE_LABELS[profile.activeRole].short} now` : ''}
           </p>
           {profile?.pairingCode && (
             <p className="pairing-code">Your invite code <strong>{profile.pairingCode}</strong></p>

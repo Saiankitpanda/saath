@@ -159,9 +159,9 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
       <section className="chairs-intro" aria-label="The two-chair room">
         <div className="chairs-illustration">
           <img
-            className="feature-photo"
-            src="/assets/saath-rehearsal.png"
-            alt="Two empty chairs in a quiet room"
+            className="feature-photo chairs-conversation-art"
+            src="/assets/saath-two-chairs.jpg"
+            alt="Two people sitting across from each other in a quiet conversation"
           />
         </div>
         <div className="chairs-intro-copy">

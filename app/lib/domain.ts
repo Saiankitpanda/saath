@@ -22,7 +22,14 @@ export type View =
   | 'onboard'
   | 'conversation'
   | 'enroll'
-  | 'arrive';
+  | 'arrive'
+  | 'strangers';
+
+/** Display names — keep storage keys as client / listener */
+export const ROLE_LABELS = {
+  client: { short: 'Seeker', long: 'Seeker · I came to talk', verb: 'seeking' },
+  listener: { short: 'Companion', long: 'Companion · I can sit with someone', verb: 'companioning' },
+} as const;
 
 export type EnrollmentRole = 'client' | 'listener';
 
@@ -79,6 +86,40 @@ export type MoodEntry = {
   createdAt: string;
 };
 
+/** One calm check-in per 24 hours (browser fixture). */
+export type DailyCheckIn = {
+  id: string;
+  mood: MoodKind;
+  dayStory: string;
+  doodleId: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export type CircleSecretComment = {
+  id: string;
+  circleId: string;
+  secretId: string;
+  authorLabel: string;
+  body: string;
+  createdAt: string;
+};
+
+export type JoinedSessionMessage = {
+  id: string;
+  circleId: string;
+  authorLabel: string;
+  body: string;
+  createdAt: string;
+};
+
+export type StrangerPref = {
+  lastPeerId: string | null;
+  lastPeerName: string | null;
+  situation: string;
+  updatedAt: string;
+};
+
 export type CompanionCategory = 'relationships' | 'work' | 'slow' | 'family';
 
 export type Person = {
@@ -102,9 +143,41 @@ export type Person = {
   actuallyAvailable: boolean;
   sample?: boolean;
   avatarUrl?: string;
+  /** Asset key under /saath — mira | ari | noor | tara */
+  characterKey?: 'mira' | 'ari' | 'noor' | 'tara';
   rating?: number;
   experienceYears?: number;
   isVerified?: boolean;
+};
+
+export type DoodleMotif = 'none' | 'leaf' | 'river' | 'hill' | 'moon';
+
+export type ThemeTokens = {
+  pageBg: string;
+  cardSurface: string;
+  accent: string;
+  onAccent: string;
+  text: string;
+  muted: string;
+  border: string;
+};
+
+export type ThemePreset = {
+  id: string;
+  name: string;
+  tokens: ThemeTokens;
+  motif: DoodleMotif;
+  updatedAt: string;
+};
+
+export type ColorMode = 'light' | 'dark';
+
+export type AppearanceState = {
+  schemaVersion: 1;
+  activeThemeId: string | null;
+  presets: ThemePreset[];
+  motionEnabled: boolean;
+  colorMode: ColorMode;
 };
 
 export type CaseStudy = {

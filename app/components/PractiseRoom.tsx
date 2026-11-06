@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Armchair, ArrowRight, ArrowUpRight, Plus, Send, Sparkles } from 'lucide-react';
+import CharacterWait from '@/components/CharacterWait';
 import { staticWritingPrompts } from '@/lib/fixtures';
 
 type Message = { role: 'user' | 'assistant'; content: string };
@@ -208,9 +209,32 @@ export default function PractiseRoom({
       </div>
 
       <nav className="practise-steps" aria-label="Practise steps">
-        <button type="button" className={phase === 'describe' ? 'active' : ''} onClick={() => setPhase('describe')}>1 · Your scene</button>
-        <button type="button" className={phase === 'explore' ? 'active' : ''} disabled={!scenarioStory.trim()} onClick={() => scenarioStory.trim() && setPhase('explore')}>2 · Clarify</button>
-        <button type="button" className={phase === 'rehearse' ? 'active' : ''} disabled={!scenarioStory.trim()} onClick={() => scenarioStory.trim() && startLinkedRehearsal()}>3 · Practise</button>
+        {([
+          { id: 'describe' as Phase, label: '1 · Your scene', ready: true },
+          { id: 'explore' as Phase, label: '2 · Clarify', ready: Boolean(scenarioStory.trim()) },
+          { id: 'rehearse' as Phase, label: '3 · Practise', ready: Boolean(scenarioStory.trim()) },
+        ]).map(step => {
+          const order: Phase[] = ['describe', 'explore', 'rehearse'];
+          const currentIndex = order.indexOf(phase);
+          const stepIndex = order.indexOf(step.id);
+          const status = phase === step.id ? 'current' : stepIndex < currentIndex ? 'completed' : 'upcoming';
+          return (
+            <button
+              key={step.id}
+              type="button"
+              className={`practise-step practise-step-${status}${phase === step.id ? ' active' : ''}`}
+              aria-current={phase === step.id ? 'step' : undefined}
+              disabled={!step.ready}
+              onClick={() => {
+                if (step.id === 'describe') setPhase('describe');
+                else if (step.id === 'explore' && scenarioStory.trim()) setPhase('explore');
+                else if (step.id === 'rehearse' && scenarioStory.trim()) startLinkedRehearsal();
+              }}
+            >
+              {status === 'completed' ? `✓ ${step.label}` : step.label}
+            </button>
+          );
+        })}
       </nav>
 
       {phase === 'describe' && (
@@ -307,7 +331,7 @@ export default function PractiseRoom({
               )}
             </div>
             <aside className="practise-side-art">
-              <img src="/assets/saath-rehearsal.png" alt="Two empty chairs in a rehearsal room"/>
+              <img src="/assets/saath-two-chairs.jpg" alt="Two people sitting across from each other in a thoughtful conversation"/>
               <p>This is practise with a fictional person. It cannot know what a real person will say — and that is the point.</p>
             </aside>
           </div>
@@ -345,7 +369,7 @@ export default function PractiseRoom({
                   <p>{message.content}</p>
                 </div>
               ))}
-              {busy && <div className="thinking">Listening…</div>}
+              {busy && <CharacterWait kind="ai" companion="noor" message="Preparing a reply…" />}
             </div>
             <form className="chat-input" onSubmit={sendExplore}>
               <textarea
@@ -408,7 +432,7 @@ export default function PractiseRoom({
                   <p>{message.content}</p>
                 </div>
               ))}
-              {busy && <div className="thinking">Preparing a reply…</div>}
+              {busy && <CharacterWait kind="ai" companion="mira" message="Preparing a reply…" />}
             </div>
             <form className="chat-input" onSubmit={sendRehearsal}>
               <textarea aria-label="Your rehearsal message" placeholder="What do you want to try saying?" value={draft} onChange={event => setDraft(event.target.value)} maxLength={2000}/>

@@ -12,7 +12,12 @@
   {
     "file": "public/assets/saath-rehearsal.png",
     "width": 1536,
-    "height": 1024
+    "height": 1024,
+    "note": "Legacy empty-chairs art; superseded by saath-two-chairs.jpg"
+  },
+  {
+    "file": "public/assets/saath-two-chairs.jpg",
+    "note": "Two people in conversation — Two chairs + Practise intro"
   },
   {
     "file": "public/assets/saath-listen-hero.jpg",

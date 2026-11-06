@@ -6,89 +6,93 @@ export { FIXTURE_NOTICE, SAMPLE_PROFILE_NOTICE };
 export const samplePeople: Person[] = [
   {
     id: 'sample-meera',
-    name: 'Vespera',
+    name: 'Mira',
     role: 'Peer listener',
     kind: 'ai-persona',
     domain: 'Relationships and feeling less alone',
-    specialty: 'Relationships & feeling alone',
-    tag: 'Relationships & feeling alone',
-    quote: "I've been feeling a bit alone lately, and I'm not sure why…",
+    specialty: 'Relationships',
+    tag: 'Relationships · warm & reflective',
+    quote: 'Ask one question at a time. Ask before advice.',
     category: 'relationships',
-    intro: 'Warm and thoughtful. A gentle space to talk about relationships, loneliness, and the emotions in between.',
+    intro: 'Warm and reflective. A gentle space for relationships, loneliness, and the emotions in between. Fictional AI companion.',
     languages: ['English', 'Hindi'],
     topics: ['Relationships', 'Feeling alone'],
     price: 0,
-    initials: 'V',
+    initials: 'M',
     color: 'peach',
-    avatarUrl: '/assets/companion-vespera.jpg',
-    modes: ['chat'],
-    availabilityLabel: 'AI companion — not a live person',
+    avatarUrl: '/saath/mira.webp',
+    characterKey: 'mira',
+    modes: ['chat', 'voice'],
+    availabilityLabel: 'Fictional AI companion — not a live person',
     actuallyAvailable: false,
     sample: true,
   },
   {
     id: 'sample-arjun',
-    name: 'Soren',
+    name: 'Ari',
     role: 'Peer listener',
     kind: 'ai-persona',
     domain: 'Work, studies, and starting over',
-    specialty: 'Work & studies',
-    tag: 'Work & studies',
-    quote: "I'm feeling a bit overwhelmed with everything on my plate…",
+    specialty: 'Work & change',
+    tag: 'Work & change · steady & practical',
+    quote: 'Steady company for pressure, change, and finding the next step.',
     category: 'work',
-    intro: 'Focused and supportive. A steady space to talk about study pressure, work stress, motivation, and finding balance.',
+    intro: 'Steady and practical. A clear space for study pressure, work stress, and starting over. Fictional AI companion.',
     languages: ['English', 'Hinglish'],
-    topics: ['Work & studies', 'Feeling alone'],
+    topics: ['Work & studies', 'Change'],
     price: 0,
-    initials: 'S',
+    initials: 'A',
     color: 'sage',
-    avatarUrl: '/assets/companion-soren.jpg',
-    modes: ['chat'],
-    availabilityLabel: 'AI companion — not a live person',
+    avatarUrl: '/saath/ari.webp',
+    characterKey: 'ari',
+    modes: ['chat', 'voice'],
+    availabilityLabel: 'Fictional AI companion — not a live person',
     actuallyAvailable: false,
     sample: true,
   },
   {
     id: 'sample-isha',
-    name: 'Elowen',
+    name: 'Noor',
     role: 'Peer listener',
     kind: 'ai-persona',
     domain: 'Finding words at a slower pace',
     specialty: 'A slower pace',
-    tag: 'A slower pace',
-    quote: 'I just want to slow down a little and make sense of how I am feeling…',
+    tag: 'A slower pace · brief & unhurried',
+    quote: 'No rush. One quiet question, then room to breathe.',
     category: 'slow',
-    intro: 'Calm and unhurried. A kind space to slow down, reflect, process your thoughts, and simply be, without any rush.',
+    intro: 'Brief and unhurried. A kind space to slow down and simply be. Fictional AI companion.',
     languages: ['English', 'Hindi'],
-    topics: ['Relationships', 'Work & studies'],
+    topics: ['Slowing down', 'Reflection'],
     price: 0,
-    initials: 'E',
+    initials: 'N',
     color: 'yellow',
-    avatarUrl: '/assets/companion-elowen.jpg',
-    modes: ['chat'],
-    availabilityLabel: 'AI companion — not a live person',
+    avatarUrl: '/saath/noor.webp',
+    characterKey: 'noor',
+    modes: ['chat', 'voice'],
+    availabilityLabel: 'Fictional AI companion — not a live person',
     actuallyAvailable: false,
     sample: true,
   },
   {
     id: 'sample-kabir',
-    name: 'Orrin',
+    name: 'Tara',
     role: 'Peer listener',
     kind: 'ai-persona',
-    domain: 'Family, spiritual life, and quiet sitting',
-    specialty: 'Family & quiet sitting',
-    tag: 'Family & quiet sitting',
-    quote: "There's something I've been carrying with my family, and I need a quiet place to say it…",
+    domain: 'Family, belonging, and quiet sitting',
+    specialty: 'Family & belonging',
+    tag: 'Family & belonging · gentle & attentive',
+    quote: 'Gentle attention for family tension and what you carry.',
     category: 'family',
-    intro: 'Grounded and soft-spoken. A quiet companion for family tension, faith, and sitting with what you carry — not a priest, guru, or therapist.',
-    languages: ['Hindi', 'Hinglish'],
-    topics: ['Family', 'Feeling alone'],
+    intro: 'Gentle and attentive. Soft company for family, belonging, and quiet sitting — not a priest, guru, or therapist. Fictional AI companion.',
+    languages: ['Hindi', 'Hinglish', 'English'],
+    topics: ['Family', 'Belonging'],
     price: 0,
-    initials: 'O',
+    initials: 'T',
     color: 'blue',
-    avatarUrl: '/assets/companion-orrin.jpg',
-    modes: ['chat'],
-    availabilityLabel: 'AI companion — not a live person',
+    avatarUrl: '/saath/tara.webp',
+    characterKey: 'tara',
+    modes: ['chat', 'voice'],
+    availabilityLabel: 'Fictional AI companion — not a live person',
     actuallyAvailable: false,
     sample: true,
   },
@@ -183,7 +187,17 @@ export const interestOptions: { id: InterestId; label: string }[] = [
   { id: 'alongside', label: 'Being alongside someone' },
 ];
 
-export const activityTemplates = [
+export type GuidedStep = { title: string; body: string; prompt?: string };
+
+export const activityTemplates: {
+  id: string;
+  title: string;
+  purpose: string;
+  instructions: string;
+  estimatedMinutes: number;
+  steps?: GuidedStep[];
+  kind?: 'rootd-like' | 'general';
+}[] = [
   {
     id: 'a-little-about-me',
     title: 'A little about me',
@@ -247,7 +261,126 @@ export const activityTemplates = [
     instructions: 'Use same-device if you are in one room. Use paired only after a person has actually accepted. The timer keeps you on the same page; it does not read your mind.',
     estimatedMinutes: 5,
   },
+  {
+    id: 'ground-five',
+    title: 'Ground in five',
+    purpose: 'A short Rootd-style path to steady the body when the day feels loud.',
+    instructions: 'Complete each step in order. You can pause or leave anytime. This is not emergency care.',
+    estimatedMinutes: 7,
+    kind: 'rootd-like',
+    steps: [
+      { title: 'Name where you are', body: 'Look around. Say one true thing about the room you are in.', prompt: 'I am…' },
+      { title: 'Feel your feet', body: 'Press both feet into the floor. Count three slow breaths.', prompt: 'Right now my body feels…' },
+      { title: 'Hold one object', body: 'Touch something solid near you. Notice temperature and texture.', prompt: 'This object is…' },
+      { title: 'One helpful sentence', body: 'Write one line you would tell a friend in the same moment.', prompt: 'A gentler line could be…' },
+      { title: 'Choose the next minute', body: 'Pick one small next action: water, stretch, message, or quiet.', prompt: 'For the next minute I will…' },
+    ],
+  },
+  {
+    id: 'face-or-comfort',
+    title: 'Face it or find comfort',
+    purpose: 'Two guided paths — like a calm Rootd session — for a hard spike of feeling.',
+    instructions: 'Choose one path and finish its steps. Both are practise, not treatment.',
+    estimatedMinutes: 8,
+    kind: 'rootd-like',
+    steps: [
+      { title: 'Choose your path', body: 'Path A: face the feeling with curiosity. Path B: find comfort quickly. Write which you pick.', prompt: 'I choose…' },
+      { title: 'Slow the breath', body: 'Inhale for 4, hold 1, exhale for 6. Repeat four times.', prompt: 'After breathing I notice…' },
+      { title: 'Name the wave', body: 'Give the feeling a temporary name without judging it.', prompt: 'This wave is called…' },
+      { title: 'One safe fact', body: 'Write one fact that is true right now and not catastrophic.', prompt: 'A true fact is…' },
+      { title: 'Close the loop', body: 'Thank yourself for staying. Note if you want a Companion later.', prompt: 'I will next…' },
+    ],
+  },
+  {
+    id: 'body-scan-soft',
+    title: 'Soft body scan',
+    purpose: 'A gentle Visualizr-style scan from head to hands.',
+    instructions: 'Move through each zone slowly. Skip any zone that feels too much.',
+    estimatedMinutes: 6,
+    kind: 'rootd-like',
+    steps: [
+      { title: 'Forehead and jaw', body: 'Unclench your jaw. Soften the space between your eyebrows.', prompt: 'My face feels…' },
+      { title: 'Shoulders and chest', body: 'Drop the shoulders. Notice the rise of the chest.', prompt: 'My chest feels…' },
+      { title: 'Hands and belly', body: 'Rest a hand on your belly if that feels okay.', prompt: 'My hands feel…' },
+      { title: 'Return', body: 'Open your eyes if they were closed. Name one color you see.', prompt: 'I see…' },
+    ],
+  },
 ];
+
+export const nearbyStrangerFixtures = [
+  { id: 'near-1', name: 'Rhea', distanceKm: 0.8, mood: 'tender', situation: 'Need someone who understands family pressure', languages: ['English', 'Hindi'], available: true },
+  { id: 'near-2', name: 'Dev', distanceKm: 1.4, mood: 'heavy', situation: 'Workweek that would not end', languages: ['English', 'Hinglish'], available: true },
+  { id: 'near-3', name: 'Anaya', distanceKm: 2.1, mood: 'restless', situation: 'Same hard conversation looping', languages: ['English'], available: true },
+  { id: 'near-4', name: 'Kabir', distanceKm: 3.6, mood: 'steady', situation: 'Quiet company after a long day', languages: ['Hindi', 'Hinglish'], available: false },
+  { id: 'near-5', name: 'Mira', distanceKm: 4.2, mood: 'unsure', situation: 'Starting over in a new city', languages: ['English', 'Hindi'], available: true },
+];
+
+export const circleSecrets: Record<string, { id: string; title: string; body: string; guidance: { do: string[]; dont: string[] } }[]> = {
+  'circle-after-work': [
+    {
+      id: 'sec-work-1',
+      title: 'I smiled through the meeting',
+      body: 'Everyone thought I was fine. I was counting the minutes until I could stop performing.',
+      guidance: {
+        do: ['Name one thing that was heavy without blaming a person.', 'Ask for listening before advice.', 'Take a short walk before you reply to work chat.'],
+        dont: ['Do not escalate in a late-night message.', 'Do not force someone to fix it tonight.', 'Do not shame yourself for needing rest.'],
+      },
+    },
+    {
+      id: 'sec-work-2',
+      title: 'I almost quit in my head',
+      body: 'The thought came and went. I still need the paycheck. I also need the thought to be heard.',
+      guidance: {
+        do: ['Separate the feeling from the decision for 24 hours.', 'Write what support would help this week.', 'Share with a peer who will not recruit you into drama.'],
+        dont: ['Do not send a resignation drafted in anger.', 'Do not compare your pain as a contest.', 'Do not ignore sleep and call that strength.'],
+      },
+    },
+  ],
+  'circle-hard-to-name': [
+    {
+      id: 'sec-hard-1',
+      title: 'I do not want to retell it',
+      body: 'I only want a seat next to someone who will not ask for the whole story.',
+      guidance: {
+        do: ['Say “I want company, not the full story.”', 'Leave if a question feels too sharp.', 'Use short replies that protect your pace.'],
+        dont: ['Do not pressure peers to disclose.', 'Do not dig for details to feel closer.', 'Do not turn their secret into advice for yourself.'],
+      },
+    },
+  ],
+  'circle-after-loss': [
+    {
+      id: 'sec-grief-1',
+      title: 'Ordinary days hurt more',
+      body: 'It is not the anniversary. It is Tuesday. That is what surprises me.',
+      guidance: {
+        do: ['Allow ordinary grief without a timeline.', 'Ask for a quiet check-in, not a solution.', 'Keep one small ritual that feels yours.'],
+        dont: ['Do not say “at least”.', 'Do not rush someone toward closure.', 'Do not make their grief about your advice.'],
+      },
+    },
+  ],
+  'circle-things-we-carry': [
+    {
+      id: 'sec-fam-1',
+      title: 'I still answer every call',
+      body: 'Love and exhaustion live in the same pocket. I am tired of pretending they do not.',
+      guidance: {
+        do: ['Name one boundary in plain words.', 'Practise the sentence before you send it.', 'Ask a Companion to sit with the draft.'],
+        dont: ['Do not escalate during a family fight by text.', 'Do not force a decision tonight.', 'Do not use the circle to recruit sides.'],
+      },
+    },
+  ],
+  'circle-starting-over': [
+    {
+      id: 'sec-start-1',
+      title: 'New city, old loneliness',
+      body: 'I know how to be competent. I do not know how to ask for company without sounding needy.',
+      guidance: {
+        do: ['Invite one low-stakes connection this week.', 'Share one true sentence about the in-between.', 'Keep a daily check-in for yourself first.'],
+        dont: ['Do not treat strangers as instant family.', 'Do not overshare on the first hello.', 'Do not skip rest to prove you are adapting.'],
+      },
+    },
+  ],
+};
 
 export const circleFixtures: CircleRecord[] = [
   {

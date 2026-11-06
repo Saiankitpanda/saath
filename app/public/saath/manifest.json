@@ -1,0 +1,70 @@
+{
+  "patta-idle": {
+    "png": "/saath/patta-idle.png",
+    "webp": "/saath/patta-idle.webp",
+    "width": 1254,
+    "height": 1254,
+    "transparent": true
+  },
+  "patta-greeting": {
+    "png": "/saath/patta-greeting.png",
+    "webp": "/saath/patta-greeting.webp",
+    "width": 1254,
+    "height": 1254,
+    "transparent": true
+  },
+  "patta-listening": {
+    "png": "/saath/patta-listening.png",
+    "webp": "/saath/patta-listening.webp",
+    "width": 1254,
+    "height": 1254,
+    "transparent": true
+  },
+  "patta-thanks": {
+    "png": "/saath/patta-thanks.png",
+    "webp": "/saath/patta-thanks.webp",
+    "width": 1254,
+    "height": 1254,
+    "transparent": true
+  },
+  "patta-goodbye": {
+    "png": "/saath/patta-goodbye.png",
+    "webp": "/saath/patta-goodbye.webp",
+    "width": 1254,
+    "height": 1254,
+    "transparent": true
+  },
+  "mira": {
+    "png": "/saath/mira.png",
+    "webp": "/saath/mira.webp",
+    "width": 1254,
+    "height": 1254,
+    "transparent": true
+  },
+  "ari": {
+    "png": "/saath/ari.png",
+    "webp": "/saath/ari.webp",
+    "width": 1254,
+    "height": 1254,
+    "transparent": true
+  },
+  "noor": {
+    "png": "/saath/noor.png",
+    "webp": "/saath/noor.webp",
+    "width": 1254,
+    "height": 1254,
+    "transparent": true
+  },
+  "tara": {
+    "png": "/saath/tara.png",
+    "webp": "/saath/tara.webp",
+    "width": 1254,
+    "height": 1254,
+    "transparent": true
+  },
+  "patta-greeting-preview": {
+    "gif": "/saath/patta-greeting-preview.gif",
+    "transparent": false,
+    "note": "Ivory background with title; presentation preview, not an overlay asset."
+  }
+}

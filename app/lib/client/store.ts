@@ -3,19 +3,24 @@ import {
   canTransitionActivity,
   type ActivityRecord,
   type ActivityStatus,
+  type CircleSecretComment,
   type ConversationMessage,
   type ConversationRecord,
+  type DailyCheckIn,
   type InterestId,
   type IntroAnswers,
   type IntroductionCard,
+  type JoinedSessionMessage,
   type MoodEntry,
   type MoodKind,
   type ProviderDraft,
   type CircleMembership,
   type CirclePost,
+  type StrangerPref,
 } from '@/lib/domain';
 
 const KEY = 'saath-dev-fixtures-v1';
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type FixtureState = {
   notice: string;
@@ -31,6 +36,12 @@ export type FixtureState = {
   moods: MoodEntry[];
   interests: InterestId[];
   quietThoughts: string;
+  dailyCheckIns: DailyCheckIn[];
+  checkInSnoozeUntil: string | null;
+  checkInDisabled: boolean;
+  secretComments: CircleSecretComment[];
+  sessionMessages: JoinedSessionMessage[];
+  strangerPref: StrangerPref | null;
 };
 
 const emptyIntro = (): IntroAnswers => ({
@@ -56,6 +67,12 @@ function blank(): FixtureState {
     moods: [],
     interests: [],
     quietThoughts: '',
+    dailyCheckIns: [],
+    checkInSnoozeUntil: null,
+    checkInDisabled: false,
+    secretComments: [],
+    sessionMessages: [],
+    strangerPref: null,
   };
 }
 
@@ -86,22 +103,33 @@ function read(): FixtureState {
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return blank();
-    const parsed = JSON.parse(raw) as FixtureState;
-    return {
+    const parsed = JSON.parse(raw) as FixtureState & { apiKeys?: unknown };
+    // Strip any legacy client-stored API keys — secrets belong in server env only.
+    const { apiKeys: _legacyKeys, ...rest } = parsed;
+    void _legacyKeys;
+    const cleaned: FixtureState = {
       ...blank(),
-      ...parsed,
+      ...rest,
       notice: FIXTURE_NOTICE,
-      conversations: parsed.conversations?.length ? parsed.conversations : blank().conversations,
-      moods: parsed.moods ?? [],
-      interests: parsed.interests ?? [],
-      quietThoughts: parsed.quietThoughts ?? '',
-      circlePosts: parsed.circlePosts ?? [],
-      activities: (parsed.activities ?? []).map(item => ({
+      conversations: rest.conversations?.length ? rest.conversations : blank().conversations,
+      moods: rest.moods ?? [],
+      interests: rest.interests ?? [],
+      quietThoughts: rest.quietThoughts ?? '',
+      circlePosts: rest.circlePosts ?? [],
+      dailyCheckIns: rest.dailyCheckIns ?? [],
+      checkInSnoozeUntil: rest.checkInSnoozeUntil ?? null,
+      checkInDisabled: Boolean(rest.checkInDisabled),
+      secretComments: rest.secretComments ?? [],
+      sessionMessages: rest.sessionMessages ?? [],
+      strangerPref: rest.strangerPref ?? null,
+      activities: (rest.activities ?? []).map(item => ({
         ...item,
         syncKind: item.syncKind ?? 'solo',
         syncEndsAt: item.syncEndsAt ?? '',
       })),
     };
+    if ('apiKeys' in parsed) write(cleaned);
+    return cleaned;
   } catch {
     return blank();
   }
@@ -261,6 +289,128 @@ export function saveQuietThoughts(value: string): void {
   write({ ...read(), quietThoughts: value.slice(0, 4000) });
 }
 
+export function getActiveDailyCheckIn(now = Date.now()): DailyCheckIn | null {
+  const active = (read().dailyCheckIns || []).find(item => Date.parse(item.expiresAt) > now);
+  return active ?? null;
+}
+
+export function isCheckInDisabled(): boolean {
+  return Boolean(read().checkInDisabled);
+}
+
+export function setCheckInDisabled(disabled: boolean): void {
+  write({ ...read(), checkInDisabled: disabled });
+}
+
+export function isCheckInNudgeDue(now = Date.now()): boolean {
+  if (isCheckInDisabled()) return false;
+  if (getActiveDailyCheckIn(now)) return false;
+  const snooze = read().checkInSnoozeUntil;
+  if (snooze && Date.parse(snooze) > now) return false;
+  return true;
+}
+
+export function snoozeCheckInNudge(hours = 4): void {
+  const until = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+  write({ ...read(), checkInSnoozeUntil: until });
+}
+
+export function saveDailyCheckIn(input: {
+  mood: MoodKind;
+  dayStory: string;
+  doodleId: string;
+}): DailyCheckIn {
+  const state = read();
+  const now = Date.now();
+  const entry: DailyCheckIn = {
+    id: crypto.randomUUID(),
+    mood: input.mood,
+    dayStory: input.dayStory.trim().slice(0, 2000),
+    doodleId: input.doodleId,
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + DAY_MS).toISOString(),
+  };
+  const moodEntry: MoodEntry = {
+    id: crypto.randomUUID(),
+    mood: input.mood,
+    note: input.dayStory.trim().slice(0, 400),
+    createdAt: entry.createdAt,
+  };
+  const dailyCheckIns = [entry, ...(state.dailyCheckIns || []).filter(item => Date.parse(item.expiresAt) > now)].slice(0, 14);
+  const moods = [moodEntry, ...state.moods].slice(0, 40);
+  write({ ...state, dailyCheckIns, moods });
+  return entry;
+}
+
+export function listSecretComments(circleId: string, secretId: string): CircleSecretComment[] {
+  return (read().secretComments || [])
+    .filter(item => item.circleId === circleId && item.secretId === secretId)
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+}
+
+export function addSecretComment(input: {
+  circleId: string;
+  secretId: string;
+  body: string;
+  authorLabel?: string;
+}): CircleSecretComment[] {
+  const state = read();
+  const comment: CircleSecretComment = {
+    id: `sec-c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    circleId: input.circleId,
+    secretId: input.secretId,
+    authorLabel: input.authorLabel?.trim() || 'You',
+    body: input.body.trim().slice(0, 1200),
+    createdAt: new Date().toISOString(),
+  };
+  const secretComments = [comment, ...(state.secretComments || [])].slice(0, 300);
+  write({ ...state, secretComments });
+  return listSecretComments(input.circleId, input.secretId);
+}
+
+export function listSessionMessages(circleId: string): JoinedSessionMessage[] {
+  return (read().sessionMessages || [])
+    .filter(item => item.circleId === circleId)
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+}
+
+export function addSessionMessage(input: {
+  circleId: string;
+  body: string;
+  authorLabel?: string;
+}): JoinedSessionMessage[] {
+  const state = read();
+  const message: JoinedSessionMessage = {
+    id: `sess-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    circleId: input.circleId,
+    authorLabel: input.authorLabel?.trim() || 'You',
+    body: input.body.trim().slice(0, 2000),
+    createdAt: new Date().toISOString(),
+  };
+  const sessionMessages = [...(state.sessionMessages || []), message].slice(-200);
+  write({ ...state, sessionMessages });
+  return listSessionMessages(input.circleId);
+}
+
+export function saveStrangerPref(input: {
+  lastPeerId: string | null;
+  lastPeerName: string | null;
+  situation: string;
+}): StrangerPref {
+  const strangerPref: StrangerPref = {
+    lastPeerId: input.lastPeerId,
+    lastPeerName: input.lastPeerName,
+    situation: input.situation.trim().slice(0, 400),
+    updatedAt: new Date().toISOString(),
+  };
+  write({ ...read(), strangerPref });
+  return strangerPref;
+}
+
+export function loadStrangerPref(): StrangerPref | null {
+  return read().strangerPref;
+}
+
 export function suggestActivities(
   answers: IntroAnswers | null,
   extras?: { mood?: MoodKind | null; interests?: InterestId[] },
@@ -268,11 +418,19 @@ export function suggestActivities(
   const suggestions: { templateId: string; reason: string }[] = [];
   if (extras?.mood === 'heavy' || extras?.mood === 'tender') {
     suggestions.push({
+      templateId: 'ground-five',
+      reason: 'A stepped grounding path can steady a heavy or tender day.',
+    });
+    suggestions.push({
       templateId: 'shared-quiet-minute',
       reason: 'A short shared pause can sit beside a heavy or tender day.',
     });
   }
   if (extras?.mood === 'restless' || extras?.mood === 'unsure') {
+    suggestions.push({
+      templateId: 'face-or-comfort',
+      reason: 'A guided path helps when the mind will not settle.',
+    });
     suggestions.push({
       templateId: 'what-i-carry',
       reason: 'One written thought can hold what is still unnamed.',

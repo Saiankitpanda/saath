@@ -1,0 +1,24 @@
+.saath-character {
+  display: block;
+  width: var(--saath-size, 160px);
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: var(--saath-art-surface, transparent);
+  border-radius: 18px;
+}
+.saath-character--float {
+  animation: saath-float 5.2s ease-in-out infinite;
+}
+.saath-character--bob {
+  animation: saath-float 4.8s ease-in-out infinite;
+}
+@keyframes saath-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .saath-character--float,
+  .saath-character--bob { animation: none; }
+}
