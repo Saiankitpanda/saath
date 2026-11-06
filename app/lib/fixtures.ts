@@ -1,4 +1,4 @@
-import type { CaseStudy, CircleRecord, InterestId, MoodKind, Person, TrustPoint, UrgentResource } from '@/lib/domain';
+import type { CaseStudy, CircleRecord, InterestId, MoodKind, Person, TrustPoint } from '@/lib/domain';
 import { FIXTURE_NOTICE, SAMPLE_PROFILE_NOTICE } from '@/lib/domain';
 
 export { FIXTURE_NOTICE, SAMPLE_PROFILE_NOTICE };
@@ -537,16 +537,6 @@ export const introQuestions = [
     key: 'readiness' as const,
     prompt: 'What would you like to feel more ready to do?',
     kind: 'text' as const,
-  },
-];
-
-export const urgentResources: UrgentResource[] = [
-  {
-    region: 'International directory',
-    name: 'IASP find a helpline',
-    url: 'https://www.iasp.info/suicidalthoughts/',
-    reviewedOn: '2026-11-01',
-    note: 'Directory maintained by the International Association for Suicide Prevention. Saath does not dispatch emergency services.',
   },
 ];
 
