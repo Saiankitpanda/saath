@@ -622,16 +622,19 @@ function App() {
           {view === "connect" && (
             <div className="listen-shell">
               <section className="listen-hero">
-                <div className="listen-hero-media" aria-hidden="true">
-                  <img src="/assets/saath-listen-hero.jpg" alt="" />
+                <div className="listen-hero-media">
+                  <img
+                    src="/assets/saath-listen-hero.jpg"
+                    alt="A quiet conversation with a soft cloud companion by the window"
+                  />
                 </div>
                 <div className="listen-hero-veil" aria-hidden="true" />
                 <div className="listen-hero-copy">
-                  <div className="eyebrow">A LITTLE SPACE FOR YOU</div>
-                  <h1>Some things feel lighter<br/>when you <em>say them.</em></h1>
-                  <p>Choose an AI companion for voice chat or a private DM. No video with AI — that keeps the space soft and clear.</p>
+                  <div className="eyebrow">LISTEN · THEN ACT</div>
+                  <h1>A quiet companion<br/>when you need to <em>speak.</em></h1>
+                  <p>Start with voice or a private DM. When you are ready, talk to a real stranger nearby — nothing is forced.</p>
                   <div className="listen-hero-actions">
-                    <button className="button" type="button" onClick={() => document.getElementById("companions")?.scrollIntoView({ behavior: "smooth" })}>
+                    <button className="button" type="button" onClick={() => document.getElementById("companions")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
                       Meet your companion <ArrowRight size={17}/>
                     </button>
                     <button className="text-button listen-hero-ghost" type="button" onClick={() => go("strangers")}>

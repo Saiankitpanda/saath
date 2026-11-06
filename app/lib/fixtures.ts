@@ -505,11 +505,11 @@ export const sampleCirclePosts = [
 ];
 
 export const momentPhrases = [
-  'I’m feeling overwhelmed.',
-  'I don’t know how to explain it yet.',
-  'Could you listen without giving advice?',
-  'Can we take this slowly?',
-  'I need a little company.',
+  'I’m panicking and need someone with me.',
+  'I’m overwhelmed — please listen without advice.',
+  'Can we take this slowly? I can’t find the words yet.',
+  'I need a little company until this wave passes.',
+  'I feel unsafe in my body, not necessarily in danger.',
 ];
 
 export const introQuestions = [
