@@ -299,14 +299,6 @@ export type CirclePost = {
   fixture?: boolean;
 };
 
-export type UrgentResource = {
-  region: string;
-  name: string;
-  url: string;
-  reviewedOn: string;
-  note: string;
-};
-
 export const REQUEST_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
   pending: ['accepted', 'declined', 'cancelled', 'expired'],
   accepted: [],

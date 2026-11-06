@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { ArrowRight, Leaf, MessageCircle, Pause, Phone, Users, X } from 'lucide-react';
-import { momentPhrases, samplePeople, urgentResources } from '@/lib/fixtures';
+import { momentPhrases, samplePeople } from '@/lib/fixtures';
 import { useAmbient } from '@/components/AmbientSound';
 import BreathingExercise from '@/components/BreathingExercise';
 import type { Person, View } from '@/lib/domain';
@@ -39,7 +39,6 @@ function readSize(): Size {
 
 export default function NeedAMoment({ go, enrolled, onPhrasePreview }: Props) {
   const [open, setOpen] = useState(false);
-  const [help, setHelp] = useState(false);
   const [phrase, setPhrase] = useState('');
   const [step, setStep] = useState<Step>('ground');
   const [safeNow, setSafeNow] = useState<'yes' | 'unsure' | 'no' | null>(null);
@@ -66,7 +65,6 @@ export default function NeedAMoment({ go, enrolled, onPhrasePreview }: Props) {
 
   function closePanel() {
     setOpen(false);
-    setHelp(false);
     setPhrase('');
     setStep('ground');
     setSafeNow(null);
@@ -75,7 +73,6 @@ export default function NeedAMoment({ go, enrolled, onPhrasePreview }: Props) {
 
   function openPanel() {
     setOpen(true);
-    setHelp(false);
     setPhrase('');
     setStep('ground');
     setSafeNow(null);
@@ -178,13 +175,6 @@ export default function NeedAMoment({ go, enrolled, onPhrasePreview }: Props) {
                     ))}
                   </div>
                 </fieldset>
-
-                {safeNow === 'no' && (
-                  <div className="moment-urgent-inline" role="status">
-                    <p>If you are in immediate danger, use local emergency services. Saath cannot dispatch help.</p>
-                    <button type="button" className="outline-button" onClick={() => setHelp(true)}>Show urgent resources</button>
-                  </div>
-                )}
 
                 <fieldset className="moment-question">
                   <legend>Can you feel something solid — floor, chair, or your hands?</legend>
@@ -338,22 +328,6 @@ export default function NeedAMoment({ go, enrolled, onPhrasePreview }: Props) {
               </section>
             )}
 
-            <button type="button" className="quiet moment-urgent-toggle" onClick={() => setHelp(value => !value)}>
-              {help ? 'Hide urgent help' : 'Urgent help'}
-            </button>
-            {help && (
-              <div className="urgent-help">
-                <h3>If you need urgent help</h3>
-                <p>Saath does not dispatch emergency services and does not infer crisis from typing or sound. Use local emergency services if you are in immediate danger.</p>
-                {urgentResources.map(resource => (
-                  <p key={resource.url}>
-                    <a href={resource.url} target="_blank" rel="noreferrer">{resource.name}</a>
-                    <span> · {resource.region} · reviewed {resource.reviewedOn}</span>
-                  </p>
-                ))}
-                <p className="small-print">Unreviewed phone numbers are never invented here.</p>
-              </div>
-            )}
           </div>
 
           <button
