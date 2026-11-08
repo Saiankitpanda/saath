@@ -23,7 +23,8 @@ export type View =
   | 'conversation'
   | 'enroll'
   | 'arrive'
-  | 'strangers';
+  | 'strangers'
+  | 'profile';
 
 /** Display names — keep storage keys as client / listener */
 export const ROLE_LABELS = {
@@ -290,13 +291,29 @@ export type CircleRecord = {
   theme?: string;
 };
 
+export type CircleStoryReply = {
+  id: string;
+  postId: string;
+  authorLabel: string;
+  understanding: string;
+  similarStory?: string;
+  createdAt: string;
+  fixture?: boolean;
+};
+
 export type CirclePost = {
   id: string;
   circleId: string;
   authorLabel: string;
+  /** What the story is about — a short mention the circle can recognise. */
+  mention?: string;
+  /** The story itself. */
   body: string;
+  /** What the author wants the circle to understand. */
+  explanation?: string;
   createdAt: string;
   fixture?: boolean;
+  sampleReplies?: CircleStoryReply[];
 };
 
 export const REQUEST_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {

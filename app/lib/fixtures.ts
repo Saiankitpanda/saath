@@ -1,4 +1,4 @@
-import type { CaseStudy, CircleRecord, InterestId, MoodKind, Person, TrustPoint } from '@/lib/domain';
+import type { CaseStudy, CirclePost, CircleRecord, InterestId, MoodKind, Person, TrustPoint } from '@/lib/domain';
 import { FIXTURE_NOTICE, SAMPLE_PROFILE_NOTICE } from '@/lib/domain';
 
 export { FIXTURE_NOTICE, SAMPLE_PROFILE_NOTICE };
@@ -485,21 +485,66 @@ export const circleFixtures: CircleRecord[] = [
   },
 ];
 
-export const sampleCirclePosts = [
+export const sampleCirclePosts: CirclePost[] = [
   {
     id: 'post-fixture-1',
     circleId: 'circle-starting-over',
     authorLabel: 'A peer',
-    body: 'I moved three months ago and still feel between two lives. Today I just wanted to say that out loud.',
+    mention: 'A new city that still does not feel like mine',
+    body: 'I moved three months ago and still feel between two lives. The room is fine. The work is fine. I just keep waiting to feel arrived.',
+    explanation: 'I am not asking how to settle faster. I want someone to understand that “fine” and “home” are not the same thing yet.',
     createdAt: '2026-10-28T10:00:00.000Z',
     fixture: true,
+    sampleReplies: [
+      {
+        id: 'reply-fixture-1',
+        postId: 'post-fixture-1',
+        authorLabel: 'Someone in the circle',
+        understanding: 'You are already living there, and it still feels like a visit. That gap is the hard part.',
+        similarStory: 'I kept my old city’s weather app for a year. It was a way of not letting go.',
+        createdAt: '2026-10-28T14:10:00.000Z',
+        fixture: true,
+      },
+    ],
   },
   {
     id: 'post-fixture-2',
     circleId: 'circle-hard-to-name',
     authorLabel: 'A peer',
+    mention: 'Something I am not ready to name',
     body: 'I do not want advice tonight. I only wanted to sit next to people who will not ask me to summarise what happened.',
+    explanation: 'If you understand, you do not need the whole story. Presence is enough.',
     createdAt: '2026-10-30T18:20:00.000Z',
+    fixture: true,
+  },
+  {
+    id: 'post-fixture-3',
+    circleId: 'circle-things-we-carry',
+    authorLabel: 'A peer',
+    mention: 'A family dinner I left early',
+    body: 'I said I had a headache. I did not. I could not stay in the room while everyone talked as if last year had not happened.',
+    explanation: 'I want the circle to understand that leaving was care for myself, not a refusal to love them.',
+    createdAt: '2026-10-26T16:40:00.000Z',
+    fixture: true,
+  },
+  {
+    id: 'post-fixture-4',
+    circleId: 'circle-after-loss',
+    authorLabel: 'A peer',
+    mention: 'Their chair is still at the table',
+    body: 'We have not moved it. Some days that feels like love. Some days it feels like I am stuck in the doorway.',
+    explanation: 'Please do not tell me when it is time. I want to be understood for keeping the chair, not coached out of it.',
+    createdAt: '2026-10-22T08:15:00.000Z',
+    fixture: true,
+  },
+  {
+    id: 'post-fixture-5',
+    circleId: 'circle-after-work',
+    authorLabel: 'A peer',
+    mention: 'A day I smiled through',
+    body: 'Meetings went well. I said the right things. On the walk home I realised I had not told anyone the truth about how tired I am.',
+    explanation: 'I am posting so this circle can see the person behind the performance — not so someone can optimise my week.',
+    createdAt: '2026-10-29T13:05:00.000Z',
     fixture: true,
   },
 ];

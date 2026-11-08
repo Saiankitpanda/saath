@@ -41,6 +41,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
   const [busy, setBusy] = useState(false);
   const [actor, setActor] = useState<'host' | 'guest'>(localActor());
   const [call, setCall] = useState<PublicCall | null>(null);
+  const [sameDeviceChosen, setSameDeviceChosen] = useState(false);
 
   useEffect(() => {
     if (!auth) return;
@@ -153,6 +154,13 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
   const stepIndex = Math.max(0, stages.indexOf(stage));
   const speaker = chairSpeaker(stage);
   const canAskAi = Boolean(session && session.mode === 'ai' && session.status === 'active' && !session.paused && (speaker === 'b' || stage === 'switch'));
+  const localTest = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const sameDevicePath = localTest && sameDeviceChosen && mode === 'same-device';
+
+  function chooseMode(next: ChairSessionMode) {
+    setMode(next);
+    setSameDeviceChosen(next === 'same-device');
+  }
 
   return (
     <>
@@ -185,13 +193,18 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
         </span>
       </div>
 
-      {typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
+      {localTest && (
         <div className="plain-panel chair-local">
           <h2>Local two-person test</h2>
-          <p>This tab is {actor === 'guest' ? 'Guest' : 'Seedy'}. Open another tab, switch that tab to Guest, then join the room code.</p>
+          <p>
+            {sameDevicePath
+              ? 'Same device. Both people stay on this screen. There is no room code — follow the exercises below, in order.'
+              : `This tab is ${actor === 'guest' ? 'Guest' : 'Seedy'}. For two tabs, switch the other tab to Guest and use a room code. For one screen, choose Same device.`}
+          </p>
           <div className="inline-actions">
-            <button className={actor === 'host' ? 'button' : 'outline-button'} type="button" onClick={() => switchLocalActor('host')}>This tab: Seedy</button>
-            <button className={actor === 'guest' ? 'button' : 'outline-button'} type="button" onClick={() => switchLocalActor('guest')}>This tab: Guest</button>
+            <button className={sameDevicePath ? 'button' : 'outline-button'} type="button" onClick={() => chooseMode('same-device')}>Same device</button>
+            <button className={!sameDevicePath && actor === 'host' ? 'button' : 'outline-button'} type="button" onClick={() => switchLocalActor('host')}>This tab: Seedy</button>
+            <button className={!sameDevicePath && actor === 'guest' ? 'button' : 'outline-button'} type="button" onClick={() => switchLocalActor('guest')}>This tab: Guest</button>
           </div>
         </div>
       )}
@@ -204,7 +217,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
               ['ai', 'Fictional AI chair', 'You sit as Person A. A clearly fictional Person B answers on B steps.'],
               ['paired', 'Connect a person', 'Share a room code, or a listener pairing code. Presence waits for a real join.'],
             ] as [ChairSessionMode, string, string][]).map(([id, title, text]) => (
-              <button type="button" key={id} className={mode === id ? 'selected' : ''} onClick={() => setMode(id)}>
+              <button type="button" key={id} className={mode === id ? 'selected' : ''} onClick={() => chooseMode(id)}>
                 <strong>{title}</strong>
                 {text}
               </button>
@@ -221,14 +234,29 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
               {auth ? 'Open a room' : 'Sign in to open a room'} <ArrowRight size={16}/>
             </button>
           </div>
-          <section className="plain-panel">
-            <h2>Join with a room code</h2>
-            <p>If someone already opened a paired room, enter the six-character code they share with you.</p>
-            <input aria-label="Room code" value={joinCode} onChange={event => setJoinCode(event.target.value.toUpperCase())} maxLength={6} placeholder="ROOM CODE"/>
-            <div className="inline-actions">
-              <button className="outline-button" type="button" disabled={busy || joinCode.trim().length !== 6} onClick={joinRoom}>Join as Person B</button>
-            </div>
-          </section>
+          {sameDevicePath ? (
+            <section className="plain-panel" aria-label="Exercises for this screen">
+              <h2>Exercises you both do</h2>
+              <p>Stay on this device. Take these in order. Either person can pass, pause, or leave.</p>
+              <ol className="same-device-exercises">
+                {stages.map((id, index) => (
+                  <li key={id}>
+                    <strong>{index + 1}. {chairCopy[id].title}</strong>
+                    <span>{chairCopy[id].text}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : (
+            <section className="plain-panel">
+              <h2>Join with a room code</h2>
+              <p>If someone already opened a paired room, enter the six-character code they share with you.</p>
+              <input aria-label="Room code" value={joinCode} onChange={event => setJoinCode(event.target.value.toUpperCase())} maxLength={6} placeholder="ROOM CODE"/>
+              <div className="inline-actions">
+                <button className="outline-button" type="button" disabled={busy || joinCode.trim().length !== 6} onClick={joinRoom}>Join as Person B</button>
+              </div>
+            </section>
+          )}
           {sessions.some(row => row.status !== 'closed') && (
             <section className="plain-panel">
               <h2>Open rooms on this account</h2>
@@ -333,21 +361,36 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
               <textarea placeholder="One thing I want to remember…" value={note} onChange={event => setNote(event.target.value)} maxLength={2000}/>
               <button className="text-button" type="button" disabled={busy} onClick={() => act('note', { note })}>Save note</button>
             </section>
-            <section className="plain-panel">
-              <h2>Call or invite</h2>
-              <p>Room code <strong>{session.code}</strong>. A voice call starts only after the other person has joined this paired room.</p>
-              <div className="inline-actions">
-                <button className="outline-button" type="button" disabled={busy || session.mode !== 'paired' || !session.guestJoined} onClick={() => act('call')}>Start a voice call</button>
-                <button className="text-button" type="button" onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(`Two Chairs room ${session.code}. Join in Saath with that code when you are ready.`);
-                    onNotice('Room code copied. Send it only to the person you asked.');
-                  } catch {
-                    onNotice('Copy is not available. Write the room code down.');
-                  }
-                }}>Copy room invite</button>
-              </div>
-            </section>
+            {session.mode === 'same-device' ? (
+              <section className="plain-panel" aria-label="Exercises for this screen">
+                <h2>Exercises you both do</h2>
+                <p>Same screen. No room code. The step you are on is marked.</p>
+                <ol className="same-device-exercises">
+                  {stages.map((id, index) => (
+                    <li key={id} className={id === stage ? 'current' : index < stepIndex ? 'done' : ''}>
+                      <strong>{index + 1}. {chairCopy[id].title}</strong>
+                      <span>{chairCopy[id].text}</span>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : (
+              <section className="plain-panel">
+                <h2>Call or invite</h2>
+                <p>Room code <strong>{session.code}</strong>. A voice call starts only after the other person has joined this paired room.</p>
+                <div className="inline-actions">
+                  <button className="outline-button" type="button" disabled={busy || session.mode !== 'paired' || !session.guestJoined} onClick={() => act('call')}>Start a voice call</button>
+                  <button className="text-button" type="button" onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(`Two Chairs room ${session.code}. Join in Saath with that code when you are ready.`);
+                      onNotice('Room code copied. Send it only to the person you asked.');
+                    } catch {
+                      onNotice('Copy is not available. Write the room code down.');
+                    }
+                  }}>Copy room invite</button>
+                </div>
+              </section>
+            )}
           </div>
           {call && (
             <CallRoom

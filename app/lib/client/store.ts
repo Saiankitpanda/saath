@@ -16,6 +16,7 @@ import {
   type ProviderDraft,
   type CircleMembership,
   type CirclePost,
+  type CircleStoryReply,
   type StrangerPref,
 } from '@/lib/domain';
 
@@ -33,6 +34,7 @@ export type FixtureState = {
   circleMembership: Record<string, CircleMembership>;
   circleInterest: string[];
   circlePosts: CirclePost[];
+  circleStoryReplies: CircleStoryReply[];
   moods: MoodEntry[];
   interests: InterestId[];
   quietThoughts: string;
@@ -64,6 +66,7 @@ function blank(): FixtureState {
     circleMembership: {},
     circleInterest: [],
     circlePosts: [],
+    circleStoryReplies: [],
     moods: [],
     interests: [],
     quietThoughts: '',
@@ -116,6 +119,7 @@ function read(): FixtureState {
       interests: rest.interests ?? [],
       quietThoughts: rest.quietThoughts ?? '',
       circlePosts: rest.circlePosts ?? [],
+      circleStoryReplies: rest.circleStoryReplies ?? [],
       dailyCheckIns: rest.dailyCheckIns ?? [],
       checkInSnoozeUntil: rest.checkInSnoozeUntil ?? null,
       checkInDisabled: Boolean(rest.checkInDisabled),
@@ -223,18 +227,50 @@ export function listCirclePosts(circleId?: string): CirclePost[] {
   return circleId ? posts.filter(item => item.circleId === circleId) : posts;
 }
 
-export function addCirclePost(input: { circleId: string; body: string; authorLabel?: string }): CirclePost[] {
+export function addCirclePost(input: {
+  circleId: string;
+  body: string;
+  mention?: string;
+  explanation?: string;
+  authorLabel?: string;
+}): CirclePost[] {
   const state = read();
   const post: CirclePost = {
     id: `post-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     circleId: input.circleId,
     authorLabel: input.authorLabel?.trim() || 'You',
+    mention: input.mention?.trim().slice(0, 80) || undefined,
     body: input.body.trim().slice(0, 2000),
+    explanation: input.explanation?.trim().slice(0, 800) || undefined,
     createdAt: new Date().toISOString(),
   };
   const circlePosts = [post, ...state.circlePosts].slice(0, 200);
   write({ ...state, circlePosts });
   return circlePosts.filter(item => item.circleId === input.circleId);
+}
+
+export function listStoryReplies(postId: string): CircleStoryReply[] {
+  return read().circleStoryReplies.filter(item => item.postId === postId);
+}
+
+export function addStoryReply(input: {
+  postId: string;
+  understanding: string;
+  similarStory?: string;
+  authorLabel?: string;
+}): CircleStoryReply[] {
+  const state = read();
+  const reply: CircleStoryReply = {
+    id: `reply-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    postId: input.postId,
+    authorLabel: input.authorLabel?.trim() || 'You',
+    understanding: input.understanding.trim().slice(0, 800),
+    similarStory: input.similarStory?.trim().slice(0, 1200) || undefined,
+    createdAt: new Date().toISOString(),
+  };
+  const circleStoryReplies = [reply, ...state.circleStoryReplies].slice(0, 400);
+  write({ ...state, circleStoryReplies });
+  return circleStoryReplies.filter(item => item.postId === input.postId);
 }
 
 export function appendConversationMessage(conversationId: string, message: ConversationMessage): ConversationRecord | null {

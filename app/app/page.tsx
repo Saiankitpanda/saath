@@ -16,7 +16,7 @@ import StrangerChat from "@/components/StrangerChat";
 import StoryMoments from "@/components/StoryMoments";
 import CheckInNudge from "@/components/CheckInNudge";
 import StrangersNearby from "@/components/StrangersNearby";
-import AppearanceEditor from "@/components/AppearanceEditor";
+import ProfileHome from "@/components/ProfileHome";
 import { SaathCharacter } from "@/components/SaathCharacter";
 import CharacterWait from "@/components/CharacterWait";
 import { api } from "@/lib/client/api";
@@ -51,19 +51,14 @@ import {
   ArrowUpRight,
   Armchair,
   BookOpen,
-  Check,
-  FileText,
   Globe,
   Heart,
-  Info,
   Laptop,
   Leaf,
   Menu,
   MessageCircle,
-  Moon,
   Phone,
   Plus,
-  Send,
   ShieldCheck,
   Sparkles,
   Users,
@@ -137,7 +132,9 @@ function App() {
     const appearance = loadAppearance(null);
     setMotionEnabled(appearance.motionEnabled);
     restoreAppliedAppearance(null);
-    setAppBooting(false);
+    const started = Date.now();
+    const reveal = window.setTimeout(() => setAppBooting(false), Math.max(0, 1100 - (Date.now() - started)));
+    return () => window.clearTimeout(reveal);
   }, []);
 
   useEffect(() => {
@@ -160,7 +157,8 @@ function App() {
       requestedView === "space" ||
       requestedView === "activities" ||
       requestedView === "enroll" ||
-      requestedView === "strangers"
+      requestedView === "strangers" ||
+      requestedView === "profile"
     ) {
       setView(requestedView);
     }
@@ -452,7 +450,7 @@ function App() {
           <button className={view === "connect" || view === "strangers" ? "active" : ""} onClick={() => go("connect")}>Listen</button>
           <button className={view === "circles" ? "active" : ""} onClick={() => go("circles")}>Circles</button>
           <button className={view === "chairs" ? "active" : ""} onClick={() => { setChairsFocus("practise"); go("chairs"); }}>Two chairs</button>
-          <button className={view === "space" ? "active" : ""} onClick={() => go("space")}>My space</button>
+          <button className={view === "space" || view === "profile" ? "active" : ""} onClick={() => go("profile")}>My space</button>
         </nav>
         <div className="header-actions">
           {profile && (profile.clientEnrolled || profile.listenerEnrolled) ? (
@@ -466,9 +464,16 @@ function App() {
             </div>
           ) : (
             <button className="button small" onClick={() => go("enroll")}>
-              {auth ? "Enroll" : "Sign in"} <UserRound size={15}/>
+              {auth ? "Enroll" : "Sign in"}
             </button>
           )}
+          <button
+            className={view === "profile" || view === "space" ? "profile-entry active" : "profile-entry"}
+            aria-label="Your profile"
+            onClick={() => go("profile")}
+          >
+            <UserRound size={18} />
+          </button>
           <button className="mobile-toggle" aria-label="Toggle navigation" aria-expanded={mobile} onClick={() => setMobile(!mobile)}>{mobile ? <X/> : <Menu/>}</button>
         </div>
       </header>
@@ -506,7 +511,7 @@ function App() {
               <button onClick={() => go("circles")}><span className="topic-icon tint-2"><Users size={18}/></span>Circles<ArrowUpRight className="pill-arrow" size={14}/></button>
               <button onClick={() => { setChairsFocus("practise"); go("chairs"); }}><span className="topic-icon tint-2"><Sparkles size={18}/></span>Practise first<ArrowUpRight className="pill-arrow" size={14}/></button>
               <button onClick={() => { setChairsFocus("room"); go("chairs"); }}><span className="topic-icon tint-3"><Armchair size={18}/></span>Two chairs<ArrowUpRight className="pill-arrow" size={14}/></button>
-              <button onClick={() => go("space")}><span className="topic-icon tint-0"><BookOpen size={18}/></span>My space<ArrowUpRight className="pill-arrow" size={14}/></button>
+              <button onClick={() => go("profile")}><span className="topic-icon tint-0"><BookOpen size={18}/></span>My space<ArrowUpRight className="pill-arrow" size={14}/></button>
             </div>
           </section>
           <section className="section pathways">
@@ -962,226 +967,49 @@ function App() {
             </div>
           )}
 
-          {view === "space" && (() => {
-            const pendingRequests = requests.filter(item => item.status === "pending");
-            const acceptedRequests = requests.filter(item => item.status === "accepted");
-            const shownRequests = connectionTab === "pending" ? pendingRequests : acceptedRequests;
-            return (
-            <div className="space-shell">
-              <header className="space-top">
-                <div>
-                  <h1>Your space, at your <em>pace.</em></h1>
-                  <p>Write what you need. Share only when you choose. Nothing leaves this page until you say so.</p>
-                </div>
-                <svg className="space-branch" viewBox="0 0 160 120" aria-hidden="true">
-                  <path d="M18 98 C48 78, 72 62, 118 28" fill="none" stroke="#7f9a88" strokeWidth="2.2" strokeLinecap="round"/>
-                  <path d="M62 72 C74 58, 86 50, 104 40" fill="none" stroke="#9bb0a2" strokeWidth="1.6" strokeLinecap="round"/>
-                  <ellipse cx="128" cy="24" rx="14" ry="8" transform="rotate(-28 128 24)" fill="#8fae9a" opacity=".85"/>
-                  <ellipse cx="108" cy="38" rx="12" ry="7" transform="rotate(-18 108 38)" fill="#a8c2b0" opacity=".9"/>
-                  <ellipse cx="86" cy="52" rx="11" ry="6.5" transform="rotate(-12 86 52)" fill="#7f9a88" opacity=".8"/>
-                  <ellipse cx="68" cy="66" rx="10" ry="6" transform="rotate(-8 68 66)" fill="#9bb0a2" opacity=".75"/>
-                  <circle cx="96" cy="46" r="3.2" fill="#d4b49a"/>
-                  <circle cx="78" cy="58" r="2.6" fill="#c9a48a"/>
-                  <circle cx="116" cy="32" r="2.8" fill="#dfc2a8"/>
-                </svg>
-              </header>
-
-              {!auth && (
-                <div className="space-notice">
-                  <ShieldCheck size={18}/>
-                  <span>Sign in to save context on the server. Until then, writing stays in this browser. <a href="/signin-with-chatgpt?return_to=/?view=space">Sign in</a></span>
-                </div>
-              )}
-              {encryption?.atRest && (
-                <p className="small-print space-encrypt-note">At-rest encryption is on for saved context. End-to-end encryption is not claimed.</p>
-              )}
-
-              <div className="space-layout">
-                <div className="space-main">
-                  <section className="space-card space-card-share">
-                    <header className="space-card-head">
-                      <div className="space-card-title">
-                        <span className="space-card-icon"><FileText size={18} strokeWidth={1.6}/></span>
-                        <div>
-                          <h2>What I’d like to share</h2>
-                          <p>Prepare context for a future conversation.</p>
-                        </div>
-                      </div>
-                      <span className="space-chip">{shareMode === "private" ? "Not shared" : "Ask first"}</span>
-                    </header>
-                    <textarea
-                      id="life-context"
-                      value={context}
-                      onChange={event => setContext(event.target.value)}
-                      maxLength={4000}
-                      placeholder="Start with what feels important…"
-                    />
-                    <div className="space-card-meta">
-                      <span className="field-count">{context.length}/4000</span>
-                      <label className="space-inline-label">Visibility
-                        <select value={shareMode} onChange={event => setShareMode(event.target.value as "private" | "ask-first")}>
-                          <option value="private">Private — stay with me</option>
-                          <option value="ask-first">Ask first before sharing</option>
-                        </select>
-                      </label>
-                    </div>
-                    <div className="space-card-foot">
-                      <p className="space-hint"><Info size={14}/> Saved context is not sent automatically.</p>
-                      <div className="space-card-actions">
-                        <button className="button" disabled={busy} onClick={saveContext}>{busy ? "Saving…" : "Save context"}</button>
-                        <button className="outline-button" type="button" onClick={() => setContext("")}>Clear draft</button>
-                      </div>
-                    </div>
-                    <div className="space-share-block">
-                      <div className="space-share-title"><Send size={15}/> Share only when you choose</div>
-                      <div className="space-share-row">
-                        <select
-                          value={shareTarget}
-                          onChange={event => setShareTarget(event.target.value)}
-                          disabled={!acceptedRequests.length}
-                          aria-label="Choose a connection to share with"
-                        >
-                          <option value="">{acceptedRequests.length ? "Choose a connection" : "No accepted connections yet"}</option>
-                          {acceptedRequests.map(item => (
-                            <option key={item.id} value={item.id}>{item.providerName}</option>
-                          ))}
-                        </select>
-                        <button
-                          className="outline-button"
-                          type="button"
-                          disabled={!shareTarget || !context.trim()}
-                          onClick={() => {
-                            const peer = acceptedRequests.find(item => item.id === shareTarget);
-                            flash(peer
-                              ? `Review with ${peer.providerName} in Two chairs or DM after they accept. Context is not sent from this button alone.`
-                              : "Choose an accepted connection first.");
-                            if (peer) go("chairs");
-                          }}
-                        >
-                          Review before sharing
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-
-                  <AppearanceEditor
-                    accountId={auth ? displayName || "signed-in" : null}
-                    onNotice={message => {
-                      flash(message);
-                      const appearance = loadAppearance(auth ? displayName || "signed-in" : null);
-                      setMotionEnabled(appearance.motionEnabled);
-                    }}
-                  />
-
-                  <section className="space-card space-card-notes">
-                    <header className="space-card-head">
-                      <div className="space-card-title">
-                        <span className="space-card-icon soft"><BookOpen size={18} strokeWidth={1.6}/></span>
-                        <div>
-                          <h2>Notes for myself</h2>
-                          <p>Stored in this browser. Not shared through pairing.</p>
-                        </div>
-                      </div>
-                    </header>
-                    <textarea
-                      className="space-notes-field"
-                      value={reflections}
-                      onChange={event => setReflections(event.target.value)}
-                      maxLength={4000}
-                      placeholder="A thought, a reminder, something to come back to…"
-                    />
-                    <div className="space-card-foot">
-                      <button
-                        className="button"
-                        type="button"
-                        onClick={() => { saveReflections(reflections); flash("Note saved in this browser."); }}
-                      >
-                        Save note
-                      </button>
-                      <span className="space-hint muted">Browser data can be cleared.</span>
-                    </div>
-                  </section>
-                </div>
-
-                <aside className="space-side">
-                  <section className="space-card space-card-connections">
-                    <header className="space-card-head compact">
-                      <div className="space-card-title">
-                        <span className="space-card-icon"><Users size={18} strokeWidth={1.6}/></span>
-                        <div><h2>Your connections</h2></div>
-                      </div>
-                    </header>
-                    <div className="space-tabs" role="tablist" aria-label="Connection status">
-                      <button type="button" role="tab" aria-selected={connectionTab === "pending"} className={connectionTab === "pending" ? "active" : ""} onClick={() => setConnectionTab("pending")}>
-                        Pending ({pendingRequests.length})
-                      </button>
-                      <button type="button" role="tab" aria-selected={connectionTab === "accepted"} className={connectionTab === "accepted" ? "active" : ""} onClick={() => setConnectionTab("accepted")}>
-                        Accepted ({acceptedRequests.length})
-                      </button>
-                    </div>
-                    {shownRequests.length ? shownRequests.map(item => (
-                      <div className="request-row" key={item.id}>
-                        <div>
-                          <strong>{item.providerName}</strong>
-                          <span>{item.topic} · {item.status}</span>
-                        </div>
-                        {item.status === "pending" && (
-                          <button className="quiet" onClick={async () => {
-                            try {
-                              const result = await api<{ request: SessionRequest }>("/api/requests", "PATCH", { id: item.id, action: "cancel" });
-                              setRequests(current => current.map(entry => entry.id === item.id ? result.request : entry));
-                              flash("Request cancelled.");
-                            } catch (error) { flash((error as Error).message); }
-                          }}>Cancel</button>
-                        )}
-                        {item.status === "accepted" && (
-                          <button className="quiet" type="button" disabled={busy} onClick={() => void startCall(item.id)}>Call</button>
-                        )}
-                      </div>
-                    )) : (
-                      <div className="space-empty">
-                        <Armchair size={34} strokeWidth={1.3}/>
-                        <p>{connectionTab === "pending"
-                          ? "No pending requests. Requests to real listeners will appear here."
-                          : "No accepted connections yet."}</p>
-                      </div>
-                    )}
-                    {activeCall && (
-                      <CallRoom
-                        call={activeCall}
-                        onChange={setActiveCall}
-                        onEnded={() => setActiveCall(null)}
-                        onNotice={flash}
-                      />
-                    )}
-                    <button className="outline-button space-side-cta" type="button" onClick={askForPerson}>
-                      Enter listener code
-                    </button>
-                  </section>
-
-                  <section className="space-card space-card-guide">
-                    <div className="space-guide-head">
-                      <Leaf size={18} strokeWidth={1.6}/>
-                      <h3>Before you share</h3>
-                    </div>
-                    <ul className="space-checklist">
-                      <li><Check size={14}/> Choose a recipient</li>
-                      <li><Check size={14}/> Review the exact context</li>
-                      <li><Check size={14}/> Confirm each time</li>
-                    </ul>
-                    <button className="text-button" type="button" onClick={() => go("intro")}>
-                      Manage saved details
-                    </button>
-                  </section>
-
-                  <button className="space-card space-quiet-card" type="button" onClick={() => ambient.openPanel()}>
-                    <Moon size={18} strokeWidth={1.6}/> Quiet corner
-                  </button>
-                </aside>
-              </div>
-            </div>
-            );
-          })()}
+          {(view === "profile" || view === "space") && (
+            <ProfileHome
+              auth={auth}
+              displayName={displayName}
+              profile={profile}
+              onNotice={flash}
+              onMotionChange={setMotionEnabled}
+              onEnroll={() => go("enroll")}
+              onSwitchRole={switchRole}
+              context={context}
+              onContextChange={setContext}
+              shareMode={shareMode}
+              onShareModeChange={setShareMode}
+              shareTarget={shareTarget}
+              onShareTargetChange={setShareTarget}
+              reflections={reflections}
+              onReflectionsChange={setReflections}
+              onSaveContext={() => { void saveContext(); }}
+              onSaveNote={() => { saveReflections(reflections); flash("Note saved in this browser."); }}
+              requests={requests}
+              connectionTab={connectionTab}
+              onConnectionTab={setConnectionTab}
+              busy={busy}
+              encryptionAtRest={Boolean(encryption?.atRest)}
+              pairingCode={pairingCode}
+              onPairingCodeChange={setPairingCode}
+              onConnect={() => { void connectStranger(); }}
+              onCancelRequest={async id => {
+                try {
+                  const result = await api<{ request: SessionRequest }>("/api/requests", "PATCH", { id, action: "cancel" });
+                  setRequests(current => current.map(entry => entry.id === id ? result.request : entry));
+                  flash("Request cancelled.");
+                } catch (error) { flash((error as Error).message); }
+              }}
+              onStartCall={id => { void startCall(id); }}
+              onWorkTogether={() => { setChairsFocus("room"); go("chairs"); }}
+              onOpenIntro={() => go("intro")}
+              onOpenQuiet={() => ambient.openPanel()}
+              activeCall={activeCall}
+              onCallChange={setActiveCall}
+              onCallEnded={() => setActiveCall(null)}
+            />
+          )}
         </main>
       )}
 

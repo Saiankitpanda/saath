@@ -6,14 +6,16 @@ import {
   addCirclePost,
   addSecretComment,
   addSessionMessage,
+  addStoryReply,
   listCirclePosts,
   listSecretComments,
   listSessionMessages,
+  listStoryReplies,
   loadFixtures,
   setCircleMembership,
 } from '@/lib/client/store';
 import { circleFixtures, circleSecrets, sampleCirclePosts } from '@/lib/fixtures';
-import type { CircleMembership, CirclePost, CircleRecord, CircleSecretComment, JoinedSessionMessage } from '@/lib/domain';
+import type { CircleMembership, CirclePost, CircleRecord, CircleSecretComment, CircleStoryReply, JoinedSessionMessage } from '@/lib/domain';
 
 type Props = {
   auth: boolean;
@@ -30,7 +32,7 @@ const themes = [
   { id: 'work', label: 'Work & study' },
 ] as const;
 
-type RoomTab = 'secrets' | 'discussion' | 'session';
+type RoomTab = 'secrets' | 'stories' | 'session';
 
 function mergePosts(circleId: string, local: CirclePost[]): CirclePost[] {
   const fixtures = sampleCirclePosts.filter(item => item.circleId === circleId);
@@ -45,9 +47,15 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
   const [membership, setMembership] = useState<Record<string, CircleMembership>>(initialMembership);
   const [theme, setTheme] = useState<(typeof themes)[number]['id']>('all');
   const [activeId, setActiveId] = useState(circleFixtures[0]?.id || '');
-  const [roomTab, setRoomTab] = useState<RoomTab>('secrets');
+  const [roomTab, setRoomTab] = useState<RoomTab>('stories');
   const [secretId, setSecretId] = useState<string | null>(null);
+  const [mention, setMention] = useState('');
   const [draft, setDraft] = useState('');
+  const [explanation, setExplanation] = useState('');
+  const [replyPostId, setReplyPostId] = useState<string | null>(null);
+  const [understandDraft, setUnderstandDraft] = useState('');
+  const [similarDraft, setSimilarDraft] = useState('');
+  const [repliesByPost, setRepliesByPost] = useState<Record<string, CircleStoryReply[]>>({});
   const [commentDraft, setCommentDraft] = useState('');
   const [sessionDraft, setSessionDraft] = useState('');
   const [sessionMessages, setSessionMessages] = useState<JoinedSessionMessage[]>([]);
@@ -74,7 +82,8 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
   function openCircle(circle: CircleRecord) {
     setActiveId(circle.id);
     setSecretId(null);
-    setRoomTab('secrets');
+    setRoomTab('stories');
+    setReplyPostId(null);
     setSessionMessages(listSessionMessages(circle.id));
   }
 
@@ -82,9 +91,9 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
     const next = setCircleMembership(circle.id, 'approved');
     setMembership(next);
     setActiveId(circle.id);
-    setRoomTab('session');
+    setRoomTab('stories');
     setSessionMessages(listSessionMessages(circle.id));
-    onNotice(`Joined session for ${circle.name}. Share thoughts in the discussion window.`);
+    onNotice(`Joined ${circle.name}. Share a story when you are ready — what it is about, the story, and what you want understood.`);
   }
 
   function leaveCircle(circle: CircleRecord) {
@@ -94,19 +103,57 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
   }
 
   function publish() {
-    if (!active || !draft.trim()) return;
+    if (!active || !mention.trim() || !draft.trim() || !explanation.trim()) return;
     if (!canPost) {
-      onNotice('Join this circle before posting.');
+      onNotice('Join this circle before posting a story.');
       return;
     }
     const rows = addCirclePost({
       circleId: active.id,
+      mention,
       body: draft,
+      explanation,
       authorLabel: displayName || (auth ? 'You' : 'Anonymous peer'),
     });
     setPostsByCircle(current => ({ ...current, [active.id]: mergePosts(active.id, rows) }));
+    setMention('');
     setDraft('');
-    onNotice('Thought saved in this browser. Live peer sync needs signup.');
+    setExplanation('');
+    onNotice('Story saved in this browser. The circle can read it here. Live sync needs signup.');
+  }
+
+  function repliesFor(post: CirclePost): CircleStoryReply[] {
+    const local = repliesByPost[post.id] ?? listStoryReplies(post.id);
+    const samples = post.sampleReplies ?? [];
+    const ids = new Set(local.map(item => item.id));
+    return [...local, ...samples.filter(item => !ids.has(item.id))].sort(
+      (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
+    );
+  }
+
+  function openReply(postId: string) {
+    setReplyPostId(current => current === postId ? null : postId);
+    setUnderstandDraft('');
+    setSimilarDraft('');
+  }
+
+  function publishReply(postId: string) {
+    if (!understandDraft.trim()) return;
+    if (!canPost) {
+      onNotice('Join this circle to answer a story.');
+      return;
+    }
+    const rows = addStoryReply({
+      postId,
+      understanding: understandDraft,
+      similarStory: similarDraft,
+      authorLabel: displayName || (auth ? 'You' : 'Anonymous peer'),
+    });
+    setRepliesByPost(current => ({ ...current, [postId]: rows }));
+    setUnderstandDraft('');
+    setSimilarDraft('');
+    setReplyPostId(null);
+    onNotice('The circle can see what you understood.');
   }
 
   function openSecret(id: string) {
@@ -160,8 +207,8 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
           <div className="eyebrow">PEER CIRCLES</div>
           <h1>Find people who have<br/>been through <em>something like it.</em></h1>
           <p>
-            Open a circle, read Secrets with care, leave a thought, then use Joined session for live discussion.
-            Peer support — not therapy, not trauma bonding, not an emergency service.
+            Share a story in three parts: mention what it is about, tell it, then explain what you want understood.
+            Read the circle the same way, and answer when you recognise it. Peer support — not therapy, not an emergency service.
           </p>
           <div className="peers-pill-row">
             <span><Users size={14}/> Same lived theme</span>
@@ -174,8 +221,8 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
           <h2>How it works</h2>
           <ol>
             <li>Pick a circle that matches what you carry.</li>
-            <li>Read Secrets — gentle stories and conflict tips.</li>
-            <li>Join for discussion and a Joined session window.</li>
+            <li>Read stories: the mention, the story, the explanation.</li>
+            <li>Post your own the same way, or say what you understood.</li>
           </ol>
           <p className="small-print">Preview stays in this browser until signup sync lands.</p>
         </aside>
@@ -257,8 +304,8 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
 
             <div className="peers-room-tabs" role="tablist" aria-label="Circle room">
               {([
+                { id: 'stories' as const, label: 'Stories' },
                 { id: 'secrets' as const, label: 'Secrets' },
-                { id: 'discussion' as const, label: 'Discussion' },
                 { id: 'session' as const, label: 'Joined session' },
               ]).map(tab => (
                 <button
@@ -342,40 +389,145 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
               </div>
             )}
 
-            {roomTab === 'discussion' && (
+            {roomTab === 'stories' && (
               <>
-                <div className="peers-composer">
-                  <label htmlFor="circle-post">Share with this circle</label>
+                <div className="story-community-head">
+                  <div>
+                    <div className="eyebrow">THE CIRCLE</div>
+                    <h3>Stories people are sharing</h3>
+                    <p>Each story names what it is about, tells it, then explains what to understand. You can answer the same way.</p>
+                  </div>
+                  <span className="story-count">{posts.length} {posts.length === 1 ? 'story' : 'stories'}</span>
+                </div>
+
+                <div className="peers-composer story-composer">
+                  <h3>Share a story</h3>
+                  <label htmlFor="story-mention">Mention what it is about</label>
+                  <input
+                    id="story-mention"
+                    value={mention}
+                    onChange={event => setMention(event.target.value)}
+                    maxLength={80}
+                    placeholder={canPost ? 'A short name for this story…' : 'Join this circle to share…'}
+                    disabled={!canPost}
+                  />
+                  <label htmlFor="circle-post">The story</label>
                   <textarea
                     id="circle-post"
                     value={draft}
                     onChange={event => setDraft(event.target.value)}
                     maxLength={2000}
-                    placeholder={canPost ? 'Write something true and gentle…' : 'Join this circle to post…'}
+                    placeholder={canPost ? 'Tell it in your own words…' : 'Join this circle to post…'}
+                    disabled={!canPost}
+                  />
+                  <label htmlFor="story-explain">Explain what you want understood</label>
+                  <textarea
+                    id="story-explain"
+                    value={explanation}
+                    onChange={event => setExplanation(event.target.value)}
+                    maxLength={800}
+                    placeholder={canPost ? 'What should this circle take from it?' : 'Join to explain…'}
                     disabled={!canPost}
                   />
                   <div className="peers-composer-foot">
                     <span className="small-print">{draft.length}/2000 · Peer support, not clinical advice</span>
-                    <button className="button" type="button" disabled={!canPost || !draft.trim()} onClick={publish}>
-                      Post <Send size={15}/>
+                    <button
+                      className="button"
+                      type="button"
+                      disabled={!canPost || !mention.trim() || !draft.trim() || !explanation.trim()}
+                      onClick={publish}
+                    >
+                      Post story <Send size={15}/>
                     </button>
                   </div>
                 </div>
-                <div className="peers-feed" aria-live="polite">
-                  <div className="eyebrow">THIS IS THE DISCUSSION</div>
-                  {posts.length ? posts.map(post => (
-                    <article key={post.id} className="peers-post">
-                      <header>
-                        <strong>{post.authorLabel}</strong>
-                        <span>{new Date(post.createdAt).toLocaleString()}</span>
-                      </header>
-                      <p>{post.body}</p>
-                      {post.fixture && <span className="peers-fixture">Illustrative preview post</span>}
-                    </article>
-                  )) : (
+
+                <div className="peers-feed story-feed" aria-live="polite">
+                  {posts.length ? posts.map(post => {
+                    const replies = repliesFor(post);
+                    const replying = replyPostId === post.id;
+                    return (
+                      <article key={post.id} className="story-card">
+                        <header>
+                          <strong>{post.authorLabel}</strong>
+                          <span>{new Date(post.createdAt).toLocaleString()}</span>
+                        </header>
+                        {post.mention && <p className="story-mention">{post.mention}</p>}
+                        <div className="story-block">
+                          <h4>The story</h4>
+                          <p>{post.body}</p>
+                        </div>
+                        {post.explanation && (
+                          <div className="story-block">
+                            <h4>What to understand</h4>
+                            <p>{post.explanation}</p>
+                          </div>
+                        )}
+                        {post.fixture && <span className="peers-fixture">Illustrative preview — a sample voice in this circle</span>}
+                        <div className="story-reply-bar">
+                          <button type="button" className="text-button" disabled={!canPost} onClick={() => openReply(post.id)}>
+                            {replying ? 'Close' : 'I understand'}
+                          </button>
+                          {replies.length > 0 && (
+                            <span className="small-print">{replies.length} {replies.length === 1 ? 'reply' : 'replies'}</span>
+                          )}
+                        </div>
+                        {replying && (
+                          <div className="story-reply-form">
+                            <label htmlFor={`understand-${post.id}`}>What you understand</label>
+                            <textarea
+                              id={`understand-${post.id}`}
+                              value={understandDraft}
+                              onChange={event => setUnderstandDraft(event.target.value)}
+                              maxLength={800}
+                              placeholder="Say back what you heard — not advice."
+                            />
+                            <label htmlFor={`similar-${post.id}`}>A story like yours, if you want</label>
+                            <textarea
+                              id={`similar-${post.id}`}
+                              value={similarDraft}
+                              onChange={event => setSimilarDraft(event.target.value)}
+                              maxLength={1200}
+                              placeholder="Optional. Only if it helps them feel less alone."
+                            />
+                            <button
+                              className="button"
+                              type="button"
+                              disabled={!understandDraft.trim()}
+                              onClick={() => publishReply(post.id)}
+                            >
+                              Share with the circle <Send size={15}/>
+                            </button>
+                          </div>
+                        )}
+                        {replies.length > 0 && (
+                          <div className="story-replies">
+                            {replies.map(reply => (
+                              <article key={reply.id} className="story-reply">
+                                <header>
+                                  <strong>{reply.authorLabel}</strong>
+                                  <span>{new Date(reply.createdAt).toLocaleString()}</span>
+                                </header>
+                                <div className="story-block">
+                                  <h4>Understood as</h4>
+                                  <p>{reply.understanding}</p>
+                                </div>
+                                {reply.similarStory && (
+                                  <div className="story-block">
+                                    <h4>A story like theirs</h4>
+                                    <p>{reply.similarStory}</p>
+                                  </div>
+                                )}
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                      </article>
+                    );
+                  }) : (
                     <div className="peers-empty">
                       <MessageCircle size={22}/>
-                      <p>No posts yet. Be the first gentle voice here.</p>
+                      <p>No stories yet. Be the first gentle voice here.</p>
                     </div>
                   )}
                 </div>
