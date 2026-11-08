@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Armchair, ArrowRight, Pause, Play, ShieldCheck } from 'lucide-react';
 import { api, localActor, setLocalActor } from '@/lib/client/api';
 import CallRoom from '@/components/CallRoom';
@@ -28,9 +28,10 @@ type Props = {
   aiConfigured: boolean;
   voiceConfigured: boolean;
   onNotice: (message: string) => void;
+  autoOpen?: boolean;
 };
 
-export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured, voiceConfigured, onNotice }: Props) {
+export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured, voiceConfigured, onNotice, autoOpen = false }: Props) {
   const [mode, setMode] = useState<ChairSessionMode>('paired');
   const [session, setSession] = useState<PublicChair | null>(null);
   const [sessions, setSessions] = useState<PublicChair[]>([]);
@@ -41,6 +42,13 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
   const [busy, setBusy] = useState(false);
   const [actor, setActor] = useState<'host' | 'guest'>(localActor());
   const [call, setCall] = useState<PublicCall | null>(null);
+  const opened = useRef(false);
+
+  useEffect(() => {
+    if (!autoOpen || !auth || opened.current) return;
+    opened.current = true;
+    void createRoom();
+  }, [autoOpen, auth]);
 
   useEffect(() => {
     if (!auth) return;
@@ -68,7 +76,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
 
   async function createRoom() {
     if (!auth) {
-      window.location.href = '/signin-with-chatgpt?return_to=/?view=chairs';
+      window.location.href = '/signin-with-chatgpt?return_to=' + encodeURIComponent('/?view=chairs&focus=room&open=1');
       return;
     }
     setBusy(true);
@@ -186,6 +194,14 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
         </span>
       </div>
 
+      {session && (
+        <div className="link-code-bar" role="status">
+          <span>Linking code</span>
+          <strong>{session.code}</strong>
+          <span>{session.guestJoined ? `${session.guestName || 'Person B'} is here. The room continues below.` : 'Share this code, then the room continues below.'}</span>
+        </div>
+      )}
+
       {localTest && (
         <div className="plain-panel chair-local">
           <h2>Connect with a person</h2>
@@ -276,7 +292,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
                   : session.paused
                     ? 'TAKE THE TIME YOU NEED'
                     : session.status === 'waiting'
-                      ? `ROOM ${session.code}`
+                      ? 'LINKING CODE ABOVE'
                       : `STEP ${stepIndex + 1} OF ${stages.length}`}
               </span>
               <h2>
@@ -296,7 +312,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
                   : session.paused
                     ? 'You can return when you both feel ready, or leave the exercise here.'
                     : session.status === 'waiting' && session.mode === 'paired' && !session.guestJoined
-                      ? `Share ${session.code}. No one is shown in the other chair until they join.`
+                      ? 'The linking code is in the bar above. No one is shown in the other chair until they join.'
                       : chairCopy[stage].text}
               </p>
               <p className="small-print">You are {session.you === 'host' ? 'Person A' : 'Person B'} · {session.mode} · {session.guestJoined ? 'Person B has joined' : 'Person B has not joined'}</p>
@@ -344,7 +360,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
             </section>
             <section className="plain-panel">
               <h2>Call or invite</h2>
-              <p>Room code <strong>{session.code}</strong>. A voice call starts only after the other person has joined.</p>
+              <p>The linking code is in the bar above, not in this panel. A voice call starts after the other person has joined.</p>
               <div className="inline-actions">
                 <button className="outline-button" type="button" disabled={busy || session.mode !== 'paired' || !session.guestJoined} onClick={() => act('call')}>Start a voice call</button>
                 <button className="text-button" type="button" onClick={async () => {

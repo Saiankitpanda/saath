@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AmbientProvider, useAmbient } from "@/components/AmbientSound";
 import NeedAMoment from "@/components/NeedAMoment";
 import ArriveHome from "@/components/ArriveHome";
@@ -29,12 +29,11 @@ import {
   saveStrangerPref,
   toggleBlock,
 } from "@/lib/client/store";
-import { caseStudies, nearbyStrangerFixtures, samplePeople, trustPoints } from "@/lib/fixtures";
+import { caseStudies, trustPoints } from "@/lib/fixtures";
 import {
   ROLE_LABELS,
   SAMPLE_PROFILE_NOTICE,
   type ActivityRecord,
-  type CompanionCategory,
   type ConversationRecord,
   type EncryptionStatus,
   type EnrollmentProfile,
@@ -52,8 +51,6 @@ import {
   Armchair,
   Globe,
   Heart,
-  Laptop,
-  Leaf,
   Menu,
   MessageCircle,
   Phone,
@@ -89,6 +86,11 @@ function App() {
   const [strangerMode, setStrangerMode] = useState<"voice" | "chat">("voice");
   const [strangerOpen, setStrangerOpen] = useState(false);
   const [listenStep, setListenStep] = useState<"meet" | "connect" | "auto" | "task">("meet");
+  const [serverStrangers, setServerStrangers] = useState<{ id: string; name: string; distanceKm: number; situation: string; languages: string[]; available: boolean }[]>([]);
+  const [callSituation, setCallSituation] = useState("");
+  const [connectedName, setConnectedName] = useState("");
+  const [openRoom, setOpenRoom] = useState(false);
+  const autoconnectStarted = useRef(false);
   const [connectionTab, setConnectionTab] = useState<"pending" | "accepted">("pending");
   const [shareTarget, setShareTarget] = useState("");
   const [chatRequest, setChatRequest] = useState<SessionRequest | null>(null);
@@ -143,6 +145,15 @@ function App() {
     const requestedView = params.get("view");
     const focus = params.get("focus");
     if (focus === "practise" || focus === "room") setChairsFocus(focus);
+    if (params.get("open") === "1") {
+      setView("chairs");
+      setChairsFocus("room");
+      setOpenRoom(true);
+    }
+    if (params.get("autoconnect") === "1") {
+      setView("connect");
+      setStrangerOpen(true);
+    }
     if (requestedView === "onboard") {
       setView("enroll");
     } else if (requestedView === "rehearsal") {
@@ -405,99 +416,61 @@ function App() {
     }
   }
 
-  function companionIcon(category: CompanionCategory) {
-    if (category === "relationships") return <Heart size={14}/>;
-    if (category === "work") return <Laptop size={14}/>;
-    if (category === "family") return <Users size={14}/>;
-    return <Leaf size={14}/>;
-  }
-
   const issueText = [intro?.beforeTalking, intro?.readiness, intro?.offLimits, context]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
-  const hasIssue = Boolean(issueText.trim() || intro?.supportStyle || intro?.pace);
 
-  function scoreCompanion(person: Person) {
-    let score = 0;
-    const blob = `${person.domain} ${person.specialty} ${person.topics.join(" ")} ${person.tag} ${person.intro} ${person.category}`.toLowerCase();
-    for (const word of issueText.split(/[^a-z0-9]+/).filter(word => word.length > 3)) {
-      if (blob.includes(word)) score += 2;
-    }
-    if (/famil|parent|home|belong|sister|brother/.test(issueText) && person.category === "family") score += 4;
-    if (/work|study|job|office|exam|city|start/.test(issueText) && person.category === "work") score += 4;
-    if (/lone|relationship|love|partner|friend/.test(issueText) && person.category === "relationships") score += 4;
-    if (/slow|quiet|overwhelm|anx|breath|tired/.test(issueText) && person.category === "slow") score += 4;
-    if (intro?.pace === "time-to-think" && person.category === "slow") score += 3;
-    if (intro?.pace === "gentle-questions" && (person.category === "family" || person.category === "relationships")) score += 2;
-    if (intro?.pace === "talking-freely" && person.category === "work") score += 1;
-    if (intro?.supportStyle === "listening" && person.category === "relationships") score += 2;
-    if (intro?.supportStyle === "suggestions" && person.category === "work") score += 2;
-    if (intro?.supportStyle === "ask-first" && person.category === "slow") score += 2;
-    if (intro?.supportStyle === "reflection" && person.category === "family") score += 2;
-    return score;
-  }
+  useEffect(() => {
+    if (view !== "connect" || !strangerOpen) return;
+    const query = new URLSearchParams({ situation: issueText });
+    api<{ strangers: { id: string; name: string; distanceKm: number; situation: string; languages: string[]; available: boolean }[] }>(`/api/strangers?${query}`)
+      .then(result => setServerStrangers(result.strangers || []))
+      .catch(error => flash((error as Error).message));
+  }, [view, strangerOpen, issueText]);
 
-  const relatedCompanions = samplePeople
-    .filter(person => !blocks.includes(person.id))
-    .map(person => ({ person, score: scoreCompanion(person) }))
-    .filter(item => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map(item => item.person);
+  useEffect(() => {
+    if (!auth || autoconnectStarted.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("autoconnect") !== "1") return;
+    autoconnectStarted.current = true;
+    setStrangerOpen(true);
+    void autoconnect();
+  }, [auth]);
 
-  const relatedNearby = nearbyStrangerFixtures.filter(item => {
-    if (!item.available || !issueText.trim()) return false;
-    const situation = item.situation.toLowerCase();
-    const words = issueText.split(/[^a-z0-9]+/).filter(word => word.length > 3);
-    if (words.some(word => situation.includes(word))) return true;
-    if (/famil|parent|home/.test(issueText) && /famil/.test(situation)) return true;
-    if (/work|job|study|office/.test(issueText) && /work/.test(situation)) return true;
-    if (/quiet|tired|long/.test(issueText) && /quiet|long/.test(situation)) return true;
-    if (/city|start|new/.test(issueText) && /start|city/.test(situation)) return true;
-    return false;
-  });
-
-  function autoconnect() {
-    const person = relatedCompanions[0];
-    if (!person) {
-      flash(hasIssue
-        ? "Nothing lines up with those answers yet. Add a little more about what you are carrying."
-        : "Answer a few questions first, then autoconnect can match someone.");
+  async function autoconnect() {
+    setListenStep("auto");
+    if (!auth) {
+      window.location.href = `/signin-with-chatgpt?return_to=${encodeURIComponent("/?view=connect&autoconnect=1")}`;
       return;
     }
-    setListenStep("auto");
-    setSelected(person);
-    flash(`Autoconnected with ${person.name} for what you shared. Connect, then do the task.`);
+    try {
+      const result = await api<{
+        stranger: { id: string; name: string; situation: string };
+        strangers: { id: string; name: string; distanceKm: number; situation: string; languages: string[]; available: boolean }[];
+        situation: string;
+        call: PublicCall;
+      }>("/api/strangers", "POST", { situation: issueText });
+      setServerStrangers(result.strangers || []);
+      setConnectedName(result.stranger.name);
+      setCallSituation(result.situation);
+      setActiveCall(result.call);
+      setListenStep("connect");
+      saveStrangerPref({ lastPeerId: result.stranger.id, lastPeerName: result.stranger.name, situation: result.situation });
+      flash(`Connected with ${result.stranger.name}. The call is about: ${result.situation}`);
+      window.setTimeout(() => document.getElementById("call-result")?.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
+    } catch (error) {
+      flash((error as Error).message);
+    }
   }
 
   function doTheTask() {
-    const person = selected || relatedCompanions[0];
-    if (!person) {
-      flash("Choose someone, or autoconnect, before the task.");
+    if (activeCall) {
+      setListenStep("task");
+      document.getElementById("call-result")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    setListenStep("task");
-    talkWithPersona(person);
-  }
-
-  function connectNearby(item: (typeof nearbyStrangerFixtures)[number]) {
-    const preview: SessionRequest = {
-      id: `near-${item.id}`,
-      providerId: item.id,
-      providerName: item.name,
-      topic: "Chat with a stranger",
-      context: item.situation,
-      mode: "chat",
-      status: "accepted",
-      createdAt: new Date().toISOString(),
-    };
-    setListenStep("connect");
-    setRequests(current => [preview, ...current.filter(entry => entry.id !== preview.id)]);
-    setAiChatPerson(null);
-    setActiveCall(null);
-    setChatRequest(preview);
-    saveStrangerPref({ lastPeerId: item.id, lastPeerName: item.name, situation: item.situation });
-    flash(`Connected with ${item.name}. You can do the task when you are ready.`);
+    void autoconnect();
   }
 
   const accepted = requests.filter(item => item.status === "accepted");
@@ -790,85 +763,35 @@ function App() {
                     <p className="small-print">{SAMPLE_PROFILE_NOTICE}</p>
                   </div>
                   <ol className="listen-steps">
-                    {([
-                      ["meet", "Meet and greet", "See people who fit what you answered."],
-                      ["connect", "Connect", "Open a profile and connect with that person."],
-                      ["auto", "Autoconnect", "Let Saath pick the closest match to your answers."],
-                      ["task", "Do the task", "Sit the conversation and work it through together."],
-                    ] as const).map(([id, title, text], index) => (
-                      <li key={id} className={listenStep === id ? "current" : ""}>
-                        <strong>{index + 1}. {title}</strong>
-                        <span>{text}</span>
-                      </li>
-                    ))}
+                    <li className={listenStep === "meet" ? "current" : ""}>
+                      <strong>1. Meet and greet</strong>
+                      <span>People from the server, matched to what you are carrying.</span>
+                      <div className="listen-nearby">
+                        {serverStrangers.map(item => (
+                          <div className="request-row" key={item.id}>
+                            <div>
+                              <strong>{item.name}</strong>
+                              <span>{item.situation} · {item.distanceKm} km</span>
+                            </div>
+                          </div>
+                        ))}
+                        {!serverStrangers.length && <p className="small-print">Loading people…</p>}
+                      </div>
+                    </li>
+                    <li className={listenStep === "connect" || listenStep === "auto" ? "current" : ""}>
+                      <strong>2. Autoconnect</strong>
+                      <span>The server picks the closest stranger and opens the call with your situation.</span>
+                    </li>
+                    <li className={listenStep === "task" ? "current" : ""}>
+                      <strong>3. The call</strong>
+                      <span>Join when the line is ready. The situation stays with the call.</span>
+                    </li>
                   </ol>
                   <div className="inline-actions">
-                    <button className="button" type="button" onClick={autoconnect}>Autoconnect</button>
-                    <button className="outline-button" type="button" onClick={doTheTask}>Do the task</button>
+                    <button className="button" type="button" onClick={() => void autoconnect()}>Autoconnect</button>
+                    <button className="outline-button" type="button" onClick={doTheTask}>Open the call</button>
                     <button className="text-button" type="button" onClick={() => go("intro")}>Update your answers</button>
                   </div>
-                  {!hasIssue && (
-                    <div className="empty-state">
-                      <Leaf/>
-                      <h2>Tell us what you are carrying.</h2>
-                      <p>Related strangers appear from your answers, not before.</p>
-                      <button className="button" type="button" onClick={() => go("intro")}>Answer a few questions</button>
-                    </div>
-                  )}
-                  {hasIssue && !relatedCompanions.length && !relatedNearby.length && (
-                    <p className="small-print">Nothing lines up with those answers yet. Add a little more, then look again.</p>
-                  )}
-                  {relatedCompanions.length > 0 && (
-                    <>
-                      <h3 className="listen-match-label">Companions for what you shared</h3>
-                      <div className="companion-grid">
-                        {relatedCompanions.map((person, index) => (
-                          <button
-                            type="button"
-                            className={"companion-card tone-" + person.color}
-                            key={person.id}
-                            style={{ animationDelay: `${index * 70}ms` }}
-                            onClick={() => { setListenStep("connect"); setSelected(person); }}
-                          >
-                            <div className="companion-portrait companion-portrait-art">
-                              <SaathCharacter
-                                name={person.characterKey || "mira"}
-                                size={168}
-                                alt=""
-                                animate={motionEnabled}
-                              />
-                            </div>
-                            <div className="companion-body">
-                              <header className="companion-top">
-                                <div className="companion-meta">
-                                  <span className="companion-badge">Fictional AI companion</span>
-                                  <h3>{person.name}</h3>
-                                  <p className="companion-tag">{companionIcon(person.category)} {person.tag}</p>
-                                </div>
-                              </header>
-                              <p className="companion-intro">{person.intro}</p>
-                              <blockquote className="companion-quote">“{person.quote}”</blockquote>
-                              <p className="companion-modes-note">Open the profile to connect and work.</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {relatedNearby.length > 0 && (
-                    <div className="listen-nearby">
-                      <h3 className="listen-match-label">Strangers in a similar situation</h3>
-                      {relatedNearby.map(item => (
-                        <div className="request-row" key={item.id}>
-                          <div>
-                            <strong>{item.name}</strong>
-                            <span>{item.situation}</span>
-                          </div>
-                          <button className="quiet" type="button" onClick={() => connectNearby(item)}>Connect</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                   {aiChatPerson && (
                     <section className="ai-dm-shell">
                       <header className="ai-dm-head">
@@ -888,12 +811,16 @@ function App() {
                     </section>
                   )}
                   {activeCall && (
-                    <CallRoom
-                      call={activeCall}
-                      onChange={setActiveCall}
-                      onEnded={() => setActiveCall(null)}
-                      onNotice={flash}
-                    />
+                    <section id="call-result" className="plain-panel">
+                      <h3>Call with {connectedName || activeCall.guestName}</h3>
+                      <p>Situation: {callSituation || "What you are carrying"}</p>
+                      <CallRoom
+                        call={activeCall}
+                        onChange={setActiveCall}
+                        onEnded={() => setActiveCall(null)}
+                        onNotice={flash}
+                      />
+                    </section>
                   )}
                   {chatRequest && (
                     <StrangerChat
@@ -993,6 +920,7 @@ function App() {
                   aiConfigured={ai}
                   voiceConfigured={voiceConfigured}
                   onNotice={flash}
+                  autoOpen={openRoom}
                 />
               )}
             </div>

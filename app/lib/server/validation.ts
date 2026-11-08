@@ -30,6 +30,9 @@ export const rehearsalSchema=z.object({
 });
 export const reportSchema=z.object({targetId:short,reason:z.string().trim().min(5).max(2000)});
 export const wordingSchema=z.object({text:z.string().trim().min(1).max(2000),consent:z.literal(true),approveFactsUnchanged:z.literal(true)});
+export const strangerConnectSchema=z.object({
+  situation:z.string().trim().max(800).optional(),
+});
 export const chairCreateSchema=z.object({
   mode:z.enum(['same-device','ai','paired']),
   displayName:z.string().trim().max(80).optional(),

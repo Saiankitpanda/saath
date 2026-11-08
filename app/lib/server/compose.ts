@@ -6,6 +6,7 @@ import { ProfileService } from '../application/profile-service.ts';
 import { RehearsalService } from '../application/rehearsal-service.ts';
 import { ReportService } from '../application/report-service.ts';
 import { RequestService } from '../application/request-service.ts';
+import { StrangerService } from '../application/stranger-service.ts';
 import { WordingService } from '../application/wording-service.ts';
 import { createFieldCipher } from '../infrastructure/aes-gcm-cipher.ts';
 import { D1CallRepository } from '../infrastructure/d1-call-repository.ts';
@@ -57,14 +58,16 @@ export function createServices() {
   const model = new OpenAICompatibleGateway();
   const rehearsal = new RehearsalService(model, new D1UsageRepository());
   const calls = new CallService(new D1CallRepository(), voiceConfig());
+  const requestRepository = new EncryptedRequestRepository(new D1RequestRepository(), cipher);
   return {
     context: new ContextService(new EncryptedContextRepository(new D1ContextRepository(), cipher)),
     requests: new RequestService(
-      new EncryptedRequestRepository(new D1RequestRepository(), cipher),
+      requestRepository,
       Date.now,
       () => crypto.randomUUID(),
       profiles,
     ),
+    strangers: new StrangerService(requestRepository, calls),
     reports: new ReportService(new D1ReportRepository()),
     rehearsal,
     wording: new WordingService(model),
