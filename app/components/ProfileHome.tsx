@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight,
   Armchair,
@@ -58,6 +58,7 @@ type Props = {
   activeCall: PublicCall | null;
   onCallChange: (call: PublicCall) => void;
   onCallEnded: () => void;
+  spaceStartsOpen?: boolean;
 };
 
 export default function ProfileHome({
@@ -94,8 +95,10 @@ export default function ProfileHome({
   activeCall,
   onCallChange,
   onCallEnded,
+  spaceStartsOpen = false,
 }: Props) {
   const [coloursOpen, setColoursOpen] = useState(false);
+  const [spaceOpen, setSpaceOpen] = useState(spaceStartsOpen);
   const enrolled = Boolean(profile?.clientEnrolled || profile?.listenerEnrolled);
   const name = profile?.displayName || displayName || 'You';
   const roles = [
@@ -106,12 +109,20 @@ export default function ProfileHome({
   const acceptedRequests = requests.filter(item => item.status === 'accepted');
   const shownRequests = connectionTab === 'pending' ? pendingRequests : acceptedRequests;
 
+  useEffect(() => {
+    setSpaceOpen(spaceStartsOpen);
+  }, [spaceStartsOpen]);
+
+  useEffect(() => {
+    if (activeCall) setSpaceOpen(true);
+  }, [activeCall]);
+
   return (
     <div className="space-shell profile-shell">
       <header className="space-top">
         <div>
           <h1>Your profile, in <em>one place.</em></h1>
-          <p>Who you are, who you are connected with, your notes, and the colours of this space. Open it from the person icon anytime.</p>
+          <p>Open this from the person icon. Notes, sharing, and connections sit here — show them when you want to work, and hide them when you do not.</p>
         </div>
         <svg className="space-branch" viewBox="0 0 160 120" aria-hidden="true">
           <path d="M18 98 C48 78, 72 62, 118 28" fill="none" stroke="#7f9a88" strokeWidth="2.2" strokeLinecap="round"/>
@@ -175,6 +186,23 @@ export default function ProfileHome({
         </div>
       </section>
 
+      <section className="space-card profile-fold">
+        <button
+          type="button"
+          className="profile-fold-toggle"
+          aria-expanded={spaceOpen}
+          onClick={() => setSpaceOpen(open => !open)}
+        >
+          <span className="space-card-icon"><BookOpen size={18} strokeWidth={1.6} /></span>
+          <span className="profile-fold-copy">
+            <strong>Notes and connections</strong>
+            <span>{spaceOpen ? 'Hide this until you need it. What you saved stays here.' : 'Open to write, share, and connect. You can hide it again anytime.'}</span>
+          </span>
+          <ChevronDown size={18} className={spaceOpen ? 'profile-fold-chevron open' : 'profile-fold-chevron'} />
+        </button>
+      </section>
+
+      {spaceOpen && (
       <div className="space-layout">
         <div className="space-main">
           <section className="space-card space-card-connections">
@@ -358,6 +386,7 @@ export default function ProfileHome({
           </button>
         </aside>
       </div>
+      )}
 
       <section className="space-card profile-fold">
         <button

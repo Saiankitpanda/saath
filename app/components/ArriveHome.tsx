@@ -88,10 +88,10 @@ export default function ArriveHome({
       text: 'Stepped paths you complete at your own pace.',
     },
     {
-      view: 'space' as View,
+      view: 'profile' as View,
       icon: Sparkles,
-      title: 'My space',
-      text: 'Private notes, requests, and what you choose to share later.',
+      title: 'Your profile',
+      text: 'Notes, connections, and what you choose to share — open the person icon.',
     },
   ];
 

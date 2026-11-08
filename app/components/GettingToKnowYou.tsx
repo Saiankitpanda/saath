@@ -82,7 +82,7 @@ export default function GettingToKnowYou({ initial, auth, ai, onClose, onSaved, 
             } else setStep(step + 1);
           }}>{step === introQuestions.length - 1 ? 'Save' : 'Save and continue'}<ArrowRight size={16}/></button>
         </div>
-        <p className="small-print">You can resume from My space. Target time is a few minutes; nothing is required to use support.</p>
+        <p className="small-print">You can resume from your profile. Target time is a few minutes; nothing is required to use support.</p>
       </div>
       <section className="plain-panel">
         <h2>Your introduction card</h2>

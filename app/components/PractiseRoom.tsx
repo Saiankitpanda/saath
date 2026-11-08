@@ -293,10 +293,10 @@ export default function PractiseRoom({
               </div>
 
               <div className="practise-privacy">
-                <p className="small-print">Nothing from My space is added unless you choose it below.</p>
+                <p className="small-print">Nothing from your profile is added unless you choose it below.</p>
                 <label className="checkbox-label">
                   <input type="checkbox" checked={includeContext} onChange={event => setIncludeContext(event.target.checked)}/>
-                  Also include notes I saved in My space
+                  Also include notes I saved in my profile
                 </label>
                 {includeContext && (
                   <textarea

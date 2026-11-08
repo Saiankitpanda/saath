@@ -73,7 +73,7 @@ export default function CheckInNudge({ enabled = true, motionEnabled = true, onS
   function turnOff() {
     setCheckInDisabled(true);
     setStep('bye');
-    onNotice?.('Check-in turned off on this device. You can re-enable it later in My space.');
+    onNotice?.('Check-in turned off on this device. You can re-enable it later from your profile.');
     window.setTimeout(hideSoon, 700);
   }
 

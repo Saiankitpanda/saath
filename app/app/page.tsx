@@ -50,7 +50,6 @@ import {
   ArrowRight,
   ArrowUpRight,
   Armchair,
-  BookOpen,
   Globe,
   Heart,
   Laptop,
@@ -450,7 +449,6 @@ function App() {
           <button className={view === "connect" || view === "strangers" ? "active" : ""} onClick={() => go("connect")}>Listen</button>
           <button className={view === "circles" ? "active" : ""} onClick={() => go("circles")}>Circles</button>
           <button className={view === "chairs" ? "active" : ""} onClick={() => { setChairsFocus("practise"); go("chairs"); }}>Two chairs</button>
-          <button className={view === "space" || view === "profile" ? "active" : ""} onClick={() => go("profile")}>My space</button>
         </nav>
         <div className="header-actions">
           {profile && (profile.clientEnrolled || profile.listenerEnrolled) ? (
@@ -504,14 +502,13 @@ function App() {
             <svg className="thread" viewBox="0 0 400 120" aria-hidden="true"><path d="M0 95 C95 140 230 15 200 20 C150 28 195 120 400 0"/></svg>
           </section>
           <section className="topic-strip">
-            <div><span className="eyebrow">START HERE</span><h2>One path. Six places.</h2></div>
+            <div><span className="eyebrow">START HERE</span><h2>One path. Five places.</h2></div>
             <div className="topic-pills">
               <button onClick={() => go("arrive")}><span className="topic-icon tint-0"><Heart size={18}/></span>Your visit<ArrowUpRight className="pill-arrow" size={14}/></button>
               <button onClick={() => go("connect")}><span className="topic-icon tint-1"><MessageCircle size={18}/></span>Listen<ArrowUpRight className="pill-arrow" size={14}/></button>
               <button onClick={() => go("circles")}><span className="topic-icon tint-2"><Users size={18}/></span>Circles<ArrowUpRight className="pill-arrow" size={14}/></button>
               <button onClick={() => { setChairsFocus("practise"); go("chairs"); }}><span className="topic-icon tint-2"><Sparkles size={18}/></span>Practise first<ArrowUpRight className="pill-arrow" size={14}/></button>
               <button onClick={() => { setChairsFocus("room"); go("chairs"); }}><span className="topic-icon tint-3"><Armchair size={18}/></span>Two chairs<ArrowUpRight className="pill-arrow" size={14}/></button>
-              <button onClick={() => go("profile")}><span className="topic-icon tint-0"><BookOpen size={18}/></span>My space<ArrowUpRight className="pill-arrow" size={14}/></button>
             </div>
           </section>
           <section className="section pathways">
@@ -582,7 +579,7 @@ function App() {
               initial={intro}
               auth={auth}
               ai={ai}
-              onClose={() => go("space")}
+              onClose={() => go("profile")}
               onSaved={(answers, completed) => { setIntro(answers); setIntroDone(completed); }}
               flash={flash}
             />
@@ -1008,6 +1005,7 @@ function App() {
               activeCall={activeCall}
               onCallChange={setActiveCall}
               onCallEnded={() => setActiveCall(null)}
+              spaceStartsOpen={view === "space"}
             />
           )}
         </main>
@@ -1072,8 +1070,8 @@ function App() {
                 <h2 id="modal-title">Your story belongs to you.</h2>
                 <p>AI personalities are fictional. Unsaved writing stays in this tab. Signed-in context and requests are stored on Vinext/D1 and access is limited to their owner. Context can be encrypted at rest when configured — that is not end-to-end encryption.</p>
                 <p>AI rehearsal only sends text after you opt in. Browser voice calling exists between two enrolled people after a request is accepted (Two Chairs / calls API). There is no call recording, and end-to-end encryption is not claimed.</p>
-                <p>You can delete your context in My space. Previously viewed content cannot be unremembered by a person who already saw it.</p>
-                <button className="button full" onClick={() => { setModal(null); go("space"); }}>Manage my context <ArrowRight size={17}/></button>
+                <p>You can delete your context from the profile icon. Previously viewed content cannot be unremembered by a person who already saw it.</p>
+                <button className="button full" onClick={() => { setModal(null); go("profile"); }}>Manage my context <ArrowRight size={17}/></button>
               </>
             )}
             {modal === "join" && (
