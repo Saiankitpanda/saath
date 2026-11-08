@@ -19,4 +19,5 @@
 .saath-sound p.saath-sound-note{font-size:10px;line-height:1.55;margin-bottom:9px}
 .saath-sound p.saath-sound-error{color:#8b4a3a;margin:9px 0 0}
 .saath-sound :focus-visible{outline:2px solid #526b86;outline-offset:4px}
-@media(max-width:600px){.saath-sound{right:16px;bottom:16px}.saath-sound-toggle{padding:10px 14px}.saath-sound-panel{padding:18px}}
+.saath-sound.quiet-panel{z-index:90;right:18px;bottom:18px;max-width:calc(100vw - 24px)}
+@media(max-width:600px){.saath-sound{right:16px;bottom:16px}.saath-sound-toggle{padding:10px 14px}.saath-sound-panel{padding:18px}.saath-sound.quiet-panel{right:12px;bottom:12px}}

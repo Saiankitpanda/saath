@@ -72,6 +72,7 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
     () => circleFixtures.filter(item => theme === 'all' || item.theme === theme),
     [theme],
   );
+  const joinedCircles = circleFixtures.filter(item => (membership[item.id] || item.membership) === 'approved');
   const active = circles.find(item => item.id === activeId) || circles[0] || circleFixtures[0];
   const status = active ? membership[active.id] || active.membership : 'none';
   const posts = active ? postsByCircle[active.id] || [] : [];
@@ -227,6 +228,34 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
           <p className="small-print">Preview stays in this browser until signup sync lands.</p>
         </aside>
       </header>
+
+      <section className="peers-joined-board" aria-label="Communities you have joined">
+        <div className="peers-joined-head">
+          <div>
+            <div className="eyebrow">YOUR COMMUNITIES</div>
+            <h2>Joined circles</h2>
+            <p>Every peer community you join stays here, so you can return without searching again.</p>
+          </div>
+          <span className="story-count">{joinedCircles.length} joined</span>
+        </div>
+        {joinedCircles.length ? (
+          <div className="peers-joined-list">
+            {joinedCircles.map(circle => (
+              <button
+                key={circle.id}
+                type="button"
+                className={active?.id === circle.id ? 'selected' : ''}
+                onClick={() => openCircle(circle)}
+              >
+                <strong>{circle.name}</strong>
+                <span>{circle.topic}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="small-print">None yet. Join a circle below and it will appear in this list.</p>
+        )}
+      </section>
 
       <div className="peers-filters" role="tablist" aria-label="Circle themes">
         {themes.map(item => (

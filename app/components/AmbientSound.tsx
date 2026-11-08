@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AudioLines, ChevronDown, Pause, Play, Volume2, X } from 'lucide-react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { Pause, Play, Volume2, X } from 'lucide-react';
 import BreathingExercise from '@/components/BreathingExercise';
 import { loadFixtures, saveQuietThoughts } from '@/lib/client/store';
 import './ambient-sound.css';
@@ -19,6 +19,27 @@ type AmbientApi = {
 };
 
 const AmbientContext = createContext<AmbientApi | null>(null);
+
+type Size = { width: number; height: number };
+const SIZE_KEY = 'saath-quiet-size-v1';
+const MIN_W = 340;
+const MIN_H = 420;
+const DEFAULT_SIZE: Size = { width: 420, height: 560 };
+
+function readQuietSize(): Size {
+  if (typeof window === 'undefined') return DEFAULT_SIZE;
+  try {
+    const raw = window.localStorage.getItem(SIZE_KEY);
+    if (!raw) return DEFAULT_SIZE;
+    const parsed = JSON.parse(raw) as Size;
+    return {
+      width: Math.min(Math.max(Number(parsed.width) || DEFAULT_SIZE.width, MIN_W), window.innerWidth - 24),
+      height: Math.min(Math.max(Number(parsed.height) || DEFAULT_SIZE.height, MIN_H), window.innerHeight - 24),
+    };
+  } catch {
+    return DEFAULT_SIZE;
+  }
+}
 
 export function useAmbient(): AmbientApi {
   const value = useContext(AmbientContext);
@@ -44,8 +65,62 @@ export function AmbientProvider({ children }: { children: React.ReactNode }) {
   const [volume, setVolume] = useState(20);
   const [error, setError] = useState('');
   const [thoughts, setThoughts] = useState('');
+  const [size, setSize] = useState<Size>(DEFAULT_SIZE);
   const session = useRef<AudioSession | null>(null);
   const generation = useRef(0);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null);
+
+  useEffect(() => {
+    setSize(readQuietSize());
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  function onResizePointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    const panel = panelRef.current;
+    if (!panel) return;
+    dragRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      startW: panel.offsetWidth,
+      startH: panel.offsetHeight,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onResizePointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const next = {
+      width: Math.min(Math.max(drag.startW + (event.clientX - drag.startX), MIN_W), window.innerWidth - 24),
+      height: Math.min(Math.max(drag.startH + (event.clientY - drag.startY), MIN_H), window.innerHeight - 24),
+    };
+    setSize(next);
+    try {
+      window.localStorage.setItem(SIZE_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function onResizePointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      /* ignore */
+    }
+  }
 
   function dispose() {
     generation.current += 1;
@@ -141,50 +216,91 @@ export function AmbientProvider({ children }: { children: React.ReactNode }) {
     error,
     play: (next = 'rain') => start(next),
     pause,
-    openPanel: () => setOpen(true),
+    openPanel: () => {
+      setSize(readQuietSize());
+      setOpen(true);
+    },
   }), [playing, busy, error, volume]);
 
   return (
     <AmbientContext.Provider value={api}>
       {children}
-      <aside className="saath-sound" aria-label="Optional ambient sound">
-        {open && <section className="saath-sound-panel" aria-labelledby="saath-sound-title">
-          <div className="saath-sound-heading"><div><span className="saath-sound-eyebrow">A LITTLE ATMOSPHERE</span><h2 id="saath-sound-title">Make room for quiet.</h2></div><button type="button" className="saath-sound-icon" onClick={() => setOpen(false)} aria-label="Close sound controls"><X size={18}/></button></div>
-          <p>Optional sound, at your pace. Silence is always welcome. Sound is a listening preference, not treatment, panic control, or brainwave therapy.</p>
-          <label className="saath-sound-label" htmlFor="saath-sound-select">Your sound</label>
-          <select id="saath-sound-select" value={sound} disabled={busy} onChange={event => changeSound(event.target.value as Sound)}><option value="rain">Gentle rain texture</option><option value="brown">Soft brown noise</option><option value="stereo">Stereo tones (headphones)</option></select>
-          {sound === 'stereo' && <p className="saath-sound-note">180 Hz left / 186 Hz right · 6 Hz difference. Listening effect; no medical or brainwave benefit claimed.</p>}
-          <div className="saath-sound-volume"><Volume2 size={16} aria-hidden="true"/><label htmlFor="saath-sound-volume">Volume</label><output htmlFor="saath-sound-volume">{volume}%</output></div>
-          <input id="saath-sound-volume" type="range" min="0" max="100" step="1" value={volume} onChange={event => setVolume(Number(event.target.value))} aria-label="Ambient sound volume"/>
-          <button type="button" className="saath-sound-play" disabled={busy} onClick={() => playing ? pause() : void start(sound)}>{playing ? <Pause size={16}/> : <Play size={16}/>} {busy ? 'Preparing sound…' : playing ? 'Pause sound' : 'Play sound'}</button>
-          <button type="button" className="saath-sound-play saath-sound-mute" onClick={pause}>Stop / mute immediately</button>
-          <button type="button" className="saath-sound-play" onClick={() => setBreathe(value => !value)}>
-            {breathe ? 'Hide breathing guide' : 'Open a breathing guide'}
-          </button>
-          {breathe && (
-            <BreathingExercise
-              onClose={() => setBreathe(false)}
-              onReady={() => setBreathe(false)}
+      <button
+        type="button"
+        className={'quiet-entry' + (playing ? ' is-playing' : '')}
+        aria-expanded={open}
+        onClick={() => setOpen(value => !value)}
+      >
+        {playing ? 'Sound on' : 'Quiet corner'}
+      </button>
+      {open && <div className="moment-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />}
+      {open && (
+        <div
+          ref={panelRef}
+          className="moment-panel saath-sound quiet-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="saath-sound-title"
+          style={{ width: size.width, height: size.height }}
+        >
+          <header className="moment-panel-head">
+            <div>
+              <span className="eyebrow">A LITTLE ATMOSPHERE</span>
+              <h2 id="saath-sound-title">Make room for quiet.</h2>
+            </div>
+            <button type="button" className="moment-close" onClick={() => setOpen(false)} aria-label="Close quiet corner">
+              <X size={18} />
+            </button>
+          </header>
+          <div className="moment-panel-body">
+            <p>Optional sound, at your pace. Silence is always welcome. Sound is a listening preference, not treatment, panic control, or brainwave therapy.</p>
+            <label className="saath-sound-label" htmlFor="saath-sound-select">Your sound</label>
+            <select id="saath-sound-select" value={sound} disabled={busy} onChange={event => changeSound(event.target.value as Sound)}>
+              <option value="rain">Gentle rain texture</option>
+              <option value="brown">Soft brown noise</option>
+              <option value="stereo">Stereo tones (headphones)</option>
+            </select>
+            {sound === 'stereo' && <p className="saath-sound-note">180 Hz left / 186 Hz right · 6 Hz difference. Listening effect; no medical or brainwave benefit claimed.</p>}
+            <div className="saath-sound-volume"><Volume2 size={16} aria-hidden="true"/><label htmlFor="saath-sound-volume">Volume</label><output htmlFor="saath-sound-volume">{volume}%</output></div>
+            <input id="saath-sound-volume" type="range" min="0" max="100" step="1" value={volume} onChange={event => setVolume(Number(event.target.value))} aria-label="Ambient sound volume"/>
+            <button type="button" className="saath-sound-play" disabled={busy} onClick={() => playing ? pause() : void start(sound)}>{playing ? <Pause size={16}/> : <Play size={16}/>} {busy ? 'Preparing sound…' : playing ? 'Pause sound' : 'Play sound'}</button>
+            <button type="button" className="saath-sound-play saath-sound-mute" onClick={pause}>Stop / mute immediately</button>
+            <button type="button" className="saath-sound-play" onClick={() => setBreathe(value => !value)}>
+              {breathe ? 'Hide breathing guide' : 'Open a breathing guide'}
+            </button>
+            {breathe && (
+              <BreathingExercise
+                onClose={() => setBreathe(false)}
+                onReady={() => setBreathe(false)}
+              />
+            )}
+            <label className="saath-sound-label" htmlFor="quiet-thoughts">Open up, if you want to</label>
+            <textarea
+              id="quiet-thoughts"
+              value={thoughts}
+              maxLength={4000}
+              placeholder="A thought you can leave here…"
+              onChange={event => {
+                const next = event.target.value;
+                setThoughts(next);
+                saveQuietThoughts(next);
+              }}
             />
-          )}
-          <label className="saath-sound-label" htmlFor="quiet-thoughts">Open up, if you want to</label>
-          <textarea
-            id="quiet-thoughts"
-            value={thoughts}
-            maxLength={4000}
-            placeholder="A thought you can leave here…"
-            onChange={event => {
-              const next = event.target.value;
-              setThoughts(next);
-              saveQuietThoughts(next);
-            }}
+            <p className="saath-sound-note">Quiet corner is for sitting with what you feel. Thoughts stay in this browser. This is not treatment or a promise that you will feel better.</p>
+            <p className="saath-sound-note">Starts only when you choose. Keep your device volume comfortable. Closing this panel keeps sound playing; use Pause or Stop to end it.</p>
+            {error && <p className="saath-sound-error" role="alert">{error}</p>}
+          </div>
+          <button
+            type="button"
+            className="moment-resize"
+            aria-label="Resize panel"
+            onPointerDown={onResizePointerDown}
+            onPointerMove={onResizePointerMove}
+            onPointerUp={onResizePointerUp}
+            onPointerCancel={onResizePointerUp}
           />
-          <p className="saath-sound-note">Quiet corner is for sitting with what you feel. Thoughts stay in this browser. This is not treatment or a promise that you will feel better.</p>
-          <p className="saath-sound-note">Starts only when you choose. Keep your device volume comfortable. Closing this panel keeps sound playing; use Pause or Stop to end it.</p>
-          {error && <p className="saath-sound-error" role="alert">{error}</p>}
-        </section>}
-        <button type="button" className={`saath-sound-toggle ${playing ? 'is-playing' : ''}`} aria-expanded={open} onClick={() => setOpen(value => !value)}><AudioLines size={18}/><span>{playing ? 'Sound on' : 'Quiet corner'}</span>{open && <ChevronDown size={15}/>}</button>
-      </aside>
+        </div>
+      )}
     </AmbientContext.Provider>
   );
 }
