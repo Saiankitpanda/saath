@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Phone, PhoneOff, Video } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Monitor,
+  Phone,
+  PhoneOff,
+  Video,
+} from 'lucide-react';
 import { api } from '@/lib/client/api';
 import type { PublicCall } from '@/lib/application/ports';
 
@@ -35,6 +43,8 @@ const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
 export default function CallRoom({ call, onChange, onEnded, onNotice }: Props) {
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(false);
+  const [videoTab, setVideoTab] = useState<'daily' | 'webrtc' | 'meet'>('daily');
+  const [copiedLink, setCopiedLink] = useState(false);
   const localAudioRef = useRef<HTMLAudioElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -43,6 +53,34 @@ export default function CallRoom({ call, onChange, onEnded, onNotice }: Props) {
   const stream = useRef<MediaStream | null>(null);
   const seenIce = useRef(new Set<string>());
   const isVideo = call.media === 'video';
+
+  const dailyRoomUrl =
+    call.dailyUrl || `https://meet.jit.si/saath-${call.code.toLowerCase()}`;
+  const googleMeetUrl = call.meetLink || 'https://meet.google.com/new';
+
+  function copyMeetingLink(url: string, label: string) {
+    try {
+      void navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      onNotice(`${label} copied to clipboard! Share it with the other person.`);
+      window.setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      onNotice('Could not copy automatically. Please copy the link manually.');
+    }
+  }
+
+  function openPopupRoom(url: string, title: string) {
+    const width = 1100;
+    const height = 750;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(
+      url,
+      title,
+      `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
+    );
+    onNotice(`${title} launched in a clean dedicated window.`);
+  }
 
   useEffect(() => {
     if (call.status === 'ended') return undefined;
@@ -180,20 +218,214 @@ export default function CallRoom({ call, onChange, onEnded, onNotice }: Props) {
         <h2 id="call-title">{call.status === 'ended' ? 'Call ended' : call.status === 'ringing' ? 'Calling…' : 'You are in the room.'}</h2>
         <p>
           {call.you === 'host' ? call.guestName : call.hostName}
-          . Browser WebRTC through Saath. Nothing is recorded by Saath.
+          . {isVideo ? 'Encrypted Video Room with Daily.co / Google Meet / WebRTC' : 'Browser WebRTC through Saath. Nothing is recorded.'}
         </p>
+
+        {isVideo && (
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              justifyContent: 'center',
+              marginTop: 12,
+              marginBottom: 8,
+              flexWrap: 'wrap',
+            }}
+          >
+            <button
+              type="button"
+              className={"outline-button " + (videoTab === 'daily' ? 'active' : '')}
+              onClick={() => setVideoTab('daily')}
+              style={{
+                fontSize: 12,
+                padding: '5px 12px',
+                borderRadius: 20,
+                background: videoTab === 'daily' ? '#f0fdf4' : 'transparent',
+                borderColor: videoTab === 'daily' ? '#22c55e' : '#cbd5e1',
+                color: videoTab === 'daily' ? '#15803d' : 'inherit',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              🎥 Daily.co HD Room
+            </button>
+            <button
+              type="button"
+              className={"outline-button " + (videoTab === 'webrtc' ? 'active' : '')}
+              onClick={() => setVideoTab('webrtc')}
+              style={{
+                fontSize: 12,
+                padding: '5px 12px',
+                borderRadius: 20,
+                background: videoTab === 'webrtc' ? '#eff6ff' : 'transparent',
+                borderColor: videoTab === 'webrtc' ? '#3b82f6' : '#cbd5e1',
+                color: videoTab === 'webrtc' ? '#1d4ed8' : 'inherit',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              🌐 In-Browser WebRTC
+            </button>
+            <button
+              type="button"
+              className={"outline-button " + (videoTab === 'meet' ? 'active' : '')}
+              onClick={() => setVideoTab('meet')}
+              style={{
+                fontSize: 12,
+                padding: '5px 12px',
+                borderRadius: 20,
+                background: videoTab === 'meet' ? '#fefce8' : 'transparent',
+                borderColor: videoTab === 'meet' ? '#eab308' : '#cbd5e1',
+                color: videoTab === 'meet' ? '#a16207' : 'inherit',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              🟢 Google Meet
+            </button>
+          </div>
+        )}
       </div>
+
       {isVideo ? (
-        <div className="meet-stage">
-          <div className="meet-tile remote">
-            <video ref={remoteVideoRef} autoPlay playsInline />
-            <span>{call.you === 'host' ? call.guestName : call.hostName}</span>
-          </div>
-          <div className="meet-tile local">
-            <video ref={localVideoRef} autoPlay playsInline muted />
-            <span>You</span>
-          </div>
-        </div>
+        <>
+          {videoTab === 'daily' && (
+            <div style={{ marginTop: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                }}
+              >
+                <span style={{ fontSize: 13, color: '#334155', fontWeight: 500 }}>
+                  Daily.co Embedded HD Video Stage
+                </span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="outline-button"
+                    onClick={() => copyMeetingLink(dailyRoomUrl, 'Daily Video Room Link')}
+                    style={{ fontSize: 11, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    {copiedLink ? <Check size={12} color="#16a34a" /> : <Copy size={12} />}
+                    {copiedLink ? 'Copied!' : 'Copy Link'}
+                  </button>
+                  <button
+                    type="button"
+                    className="outline-button"
+                    onClick={() => openPopupRoom(dailyRoomUrl, 'Daily HD Video Room')}
+                    style={{ fontSize: 11, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <ExternalLink size={12} /> Pop out
+                  </button>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  height: '520px',
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  background: '#0f172a',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+                }}
+              >
+                <iframe
+                  src={dailyRoomUrl}
+                  title="Daily.co Video Session"
+                  allow="camera; microphone; fullscreen; display-capture; autoplay"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {videoTab === 'meet' && (
+            <div
+              style={{
+                marginTop: 16,
+                marginBottom: 16,
+                padding: '28px 20px',
+                borderRadius: 12,
+                background: '#fafafa',
+                border: '1px solid #e5e7eb',
+                textAlign: 'center',
+              }}
+            >
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: '50%',
+                  background: '#fef2f2',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 12,
+                }}
+              >
+                <Video size={28} color="#ea4335" />
+              </div>
+              <h3 style={{ fontSize: 18, fontWeight: 600, color: '#111827', marginBottom: 6 }}>
+                Google Meet Video Calling
+              </h3>
+              <p style={{ fontSize: 13, color: '#4b5563', maxWidth: 460, margin: '0 auto 18px' }}>
+                Launch a high-definition meeting directly on Google Meet with real-time video, captions, and screen sharing.
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => openPopupRoom(googleMeetUrl, 'Google Meet Call')}
+                  style={{
+                    background: '#1a73e8',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '8px 18px',
+                    fontSize: 13,
+                  }}
+                >
+                  <ExternalLink size={14} /> Open in Google Meet
+                </button>
+                <button
+                  type="button"
+                  className="outline-button"
+                  onClick={() => copyMeetingLink(googleMeetUrl, 'Google Meet link')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 13 }}
+                >
+                  {copiedLink ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}
+                  <span>{copiedLink ? 'Copied!' : 'Copy Meet Link'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {videoTab === 'webrtc' && (
+            <div className="meet-stage">
+              <div className="meet-tile remote">
+                <video ref={remoteVideoRef} autoPlay playsInline />
+                <span>{call.you === 'host' ? call.guestName : call.hostName}</span>
+              </div>
+              <div className="meet-tile local">
+                <video ref={localVideoRef} autoPlay playsInline muted />
+                <span>You</span>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <div className="meet-voice-stage">
           <div className="meet-voice-orb"><Phone size={28}/></div>
@@ -202,17 +434,22 @@ export default function CallRoom({ call, onChange, onEnded, onNotice }: Props) {
           <audio ref={remoteAudioRef} autoPlay />
         </div>
       )}
+
       <div className="inline-actions meet-actions">
-        {!joined && call.status !== 'ended' && (
+        {(!joined || (isVideo && videoTab === 'webrtc')) && call.status !== 'ended' && (
           <button type="button" className="button" disabled={busy} onClick={() => void join()}>
-            {isVideo ? <Video size={16}/> : <Phone size={16}/>} Join
+            {isVideo ? <Video size={16}/> : <Phone size={16}/>} {isVideo ? 'Turn on WebRTC Camera' : 'Join Voice Line'}
           </button>
         )}
         <button type="button" className="outline-button" disabled={busy} onClick={() => void hangup()}>
-          <PhoneOff size={16}/> Hang up
+          <PhoneOff size={16}/> End Session
         </button>
       </div>
-      <p className="small-print">Mic{isVideo ? ' and camera' : ''} are requested only after Join. A person has to be on the other side.</p>
+      <p className="small-print">
+        {isVideo
+          ? 'Use Daily.co embedded player above, Google Meet in new window, or WebRTC tiles.'
+          : 'Microphone is requested only after Join. A person has to be on the other side.'}
+      </p>
     </section>
   );
 }

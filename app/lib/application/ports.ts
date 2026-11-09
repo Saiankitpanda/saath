@@ -184,6 +184,8 @@ export type PublicCall = {
   answer: string;
   remoteIce: IceCandidate[];
   livekit: { url: string; token: string; room: string } | null;
+  dailyUrl?: string | null;
+  meetLink?: string | null;
   recording: false;
 };
 

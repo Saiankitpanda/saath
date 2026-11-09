@@ -1,9 +1,27 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Armchair, ArrowRight, ArrowUpRight, Plus, Send, Sparkles } from 'lucide-react';
+import {
+  Armchair,
+  ArrowRight,
+  ArrowUpRight,
+  Loader2,
+  Plus,
+  Send,
+  Settings,
+  Sparkles,
+  Square,
+  Volume2,
+  VolumeX,
+  X,
+} from 'lucide-react';
 import CharacterWait from '@/components/CharacterWait';
 import { staticWritingPrompts } from '@/lib/fixtures';
+import {
+  speakTextWithFishAudio,
+  stopAnySpeech,
+  type SpeechStatus,
+} from '@/lib/client/fish-audio';
 
 type Message = { role: 'user' | 'assistant'; content: string };
 type Phase = 'describe' | 'explore' | 'rehearse';
@@ -50,6 +68,83 @@ export default function PractiseRoom({
   const [exploreDraft, setExploreDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Fish Audio voice state
+  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [speakingKey, setSpeakingKey] = useState<string | null>(null);
+  const [speechStatus, setSpeechStatus] = useState<SpeechStatus>('idle');
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [fishKey, setFishKey] = useState('');
+  const [fishVoiceId, setFishVoiceId] = useState('');
+  const [tempFishKey, setTempFishKey] = useState('');
+  const [tempFishVoiceId, setTempFishVoiceId] = useState('');
+
+  useEffect(() => {
+    try {
+      const savedAuto = localStorage.getItem('saath_fish_audio_autospeak');
+      if (savedAuto) setAutoSpeak(savedAuto === '1');
+      const savedKey = localStorage.getItem('saath_fish_audio_key') || '';
+      setFishKey(savedKey);
+      setTempFishKey(savedKey);
+      const savedVoice = localStorage.getItem('saath_fish_audio_voice_id') || '';
+      setFishVoiceId(savedVoice);
+      setTempFishVoiceId(savedVoice);
+    } catch {}
+    return () => {
+      stopAnySpeech();
+    };
+  }, []);
+
+  function handleToggleAutoSpeak() {
+    const next = !autoSpeak;
+    setAutoSpeak(next);
+    try {
+      localStorage.setItem('saath_fish_audio_autospeak', next ? '1' : '0');
+    } catch {}
+    if (next) {
+      onNotice('Fish Audio auto-voice enabled. AI replies will be spoken aloud.');
+    } else {
+      stopAnySpeech();
+      setSpeakingKey(null);
+      setSpeechStatus('idle');
+      onNotice('Fish Audio voice muted.');
+    }
+  }
+
+  function handleSaveVoiceSettings() {
+    setFishKey(tempFishKey.trim());
+    setFishVoiceId(tempFishVoiceId.trim());
+    try {
+      if (tempFishKey.trim()) localStorage.setItem('saath_fish_audio_key', tempFishKey.trim());
+      else localStorage.removeItem('saath_fish_audio_key');
+      if (tempFishVoiceId.trim()) localStorage.setItem('saath_fish_audio_voice_id', tempFishVoiceId.trim());
+      else localStorage.removeItem('saath_fish_audio_voice_id');
+    } catch {}
+    setShowVoiceSettings(false);
+    onNotice('Fish Audio settings saved.');
+  }
+
+  async function playSpeechForText(text: string, key: string) {
+    if (speakingKey === key && speechStatus === 'playing') {
+      stopAnySpeech();
+      setSpeakingKey(null);
+      setSpeechStatus('idle');
+      return;
+    }
+
+    setSpeakingKey(key);
+    await speakTextWithFishAudio(text, {
+      voiceId: fishVoiceId,
+      customKey: fishKey,
+      onStatusChange: status => {
+        setSpeechStatus(status);
+        if (status === 'idle' || status === 'error') {
+          setSpeakingKey(null);
+        }
+      },
+      onNotice,
+    });
+  }
 
   useEffect(() => {
     if (!seed) return;
@@ -124,7 +219,12 @@ export default function PractiseRoom({
     abortRef.current = new AbortController();
     try {
       const reply = await callRehearseApi('explore', opening, linkedScenario());
-      if (reply) setExploreMessages([...opening, { role: 'assistant', content: reply }]);
+      if (reply) {
+        setExploreMessages([...opening, { role: 'assistant', content: reply }]);
+        if (autoSpeak) {
+          void playSpeechForText(reply, `explore-${Date.now()}`);
+        }
+      }
     } catch (error) {
       if ((error as Error).name === 'AbortError') onNotice('Scenario coaching cancelled.');
       else onNotice((error as Error).message);
@@ -149,7 +249,12 @@ export default function PractiseRoom({
     abortRef.current = new AbortController();
     try {
       const reply = await callRehearseApi('explore', next, linkedScenario());
-      if (reply) setExploreMessages([...next, { role: 'assistant', content: reply }]);
+      if (reply) {
+        setExploreMessages([...next, { role: 'assistant', content: reply }]);
+        if (autoSpeak) {
+          void playSpeechForText(reply, `explore-${Date.now()}`);
+        }
+      }
     } catch (error) {
       if ((error as Error).name === 'AbortError') onNotice('Scenario coaching cancelled.');
       else onNotice((error as Error).message);
@@ -184,7 +289,12 @@ export default function PractiseRoom({
     abortRef.current = new AbortController();
     try {
       const reply = await callRehearseApi('rehearse', next, linkedScenario());
-      if (reply) setMessages([...next, { role: 'assistant', content: reply }]);
+      if (reply) {
+        setMessages([...next, { role: 'assistant', content: reply }]);
+        if (autoSpeak) {
+          void playSpeechForText(reply, `rehearse-${Date.now()}`);
+        }
+      }
     } catch (error) {
       if ((error as Error).name === 'AbortError') onNotice('Rehearsal cancelled. Nothing extra was added.');
       else onNotice((error as Error).message);
@@ -356,6 +466,38 @@ export default function PractiseRoom({
             <div className="chat-header">
               <span className="ai-symbol"><Sparkles size={20}/></span>
               <div><strong>Clarify the moment</strong><span>Gentle questions · not roleplay yet</span></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+                <button
+                  type="button"
+                  className={"outline-button " + (autoSpeak ? "active" : "")}
+                  onClick={handleToggleAutoSpeak}
+                  title={autoSpeak ? "Fish Audio auto-speak is ON (Click to mute)" : "Enable Fish Audio auto-speak for AI replies"}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 11,
+                    padding: '3px 9px',
+                    borderRadius: 14,
+                    background: autoSpeak ? '#eef2ff' : 'transparent',
+                    borderColor: autoSpeak ? '#6366f1' : '#cbd5e1',
+                    color: autoSpeak ? '#4338ca' : 'inherit',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {autoSpeak ? <Volume2 size={13} color="#4338ca" /> : <VolumeX size={13} />}
+                  <span>{autoSpeak ? 'Voice ON' : 'Voice OFF'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="quiet"
+                  onClick={() => setShowVoiceSettings(!showVoiceSettings)}
+                  title="Fish Audio settings"
+                  style={{ padding: '3px 6px', cursor: 'pointer' }}
+                >
+                  <Settings size={14} />
+                </button>
+              </div>
               <span className="quiet-tag">COACH</span>
             </div>
             <div className="chat-messages" aria-live="polite">
@@ -367,7 +509,42 @@ export default function PractiseRoom({
                 </div>
               ) : exploreMessages.map((message, index) => (
                 <div key={index} className={'message ' + message.role}>
-                  <span>{message.role === 'user' ? 'YOU' : 'COACH'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span>{message.role === 'user' ? 'YOU' : 'COACH'}</span>
+                    {message.role === 'assistant' && (
+                      <button
+                        type="button"
+                        onClick={() => void playSpeechForText(message.content, `explore-${index}`)}
+                        title="Play voice with Fish Audio"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          fontSize: 11,
+                          padding: '2px 8px',
+                          borderRadius: 12,
+                          background: speakingKey === `explore-${index}` ? '#e0e7ff' : '#f1f5f9',
+                          color: speakingKey === `explore-${index}` ? '#4338ca' : '#475569',
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {speakingKey === `explore-${index}` && speechStatus === 'loading' ? (
+                          <>
+                            <Loader2 size={11} className="spin" /> Generating…
+                          </>
+                        ) : speakingKey === `explore-${index}` && speechStatus === 'playing' ? (
+                          <>
+                            <Square size={10} fill="currentColor" /> Stop
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 size={11} /> Speak
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                   <p>{message.content}</p>
                 </div>
               ))}
@@ -416,6 +593,38 @@ export default function PractiseRoom({
             <div className="chat-header">
               <span className="ai-symbol"><Sparkles size={20}/></span>
               <div><strong>Practise room</strong><span>Fictional person · {style.toLowerCase()} · tied to your scene</span></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+                <button
+                  type="button"
+                  className={"outline-button " + (autoSpeak ? "active" : "")}
+                  onClick={handleToggleAutoSpeak}
+                  title={autoSpeak ? "Fish Audio auto-speak is ON (Click to mute)" : "Enable Fish Audio auto-speak for AI replies"}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 11,
+                    padding: '3px 9px',
+                    borderRadius: 14,
+                    background: autoSpeak ? '#eef2ff' : 'transparent',
+                    borderColor: autoSpeak ? '#6366f1' : '#cbd5e1',
+                    color: autoSpeak ? '#4338ca' : 'inherit',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {autoSpeak ? <Volume2 size={13} color="#4338ca" /> : <VolumeX size={13} />}
+                  <span>{autoSpeak ? 'Voice ON' : 'Voice OFF'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="quiet"
+                  onClick={() => setShowVoiceSettings(!showVoiceSettings)}
+                  title="Fish Audio settings"
+                  style={{ padding: '3px 6px', cursor: 'pointer' }}
+                >
+                  <Settings size={14} />
+                </button>
+              </div>
               <span className="quiet-tag">AI</span>
             </div>
             <div className="chat-messages" aria-live="polite">
@@ -430,7 +639,42 @@ export default function PractiseRoom({
                 </div>
               ) : messages.map((message, index) => (
                 <div key={index} className={'message ' + message.role}>
-                  <span>{message.role === 'user' ? 'YOU' : 'FICTIONAL PERSON'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span>{message.role === 'user' ? 'YOU' : 'FICTIONAL PERSON'}</span>
+                    {message.role === 'assistant' && (
+                      <button
+                        type="button"
+                        onClick={() => void playSpeechForText(message.content, `rehearse-${index}`)}
+                        title="Play voice with Fish Audio"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          fontSize: 11,
+                          padding: '2px 8px',
+                          borderRadius: 12,
+                          background: speakingKey === `rehearse-${index}` ? '#e0e7ff' : '#f1f5f9',
+                          color: speakingKey === `rehearse-${index}` ? '#4338ca' : '#475569',
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {speakingKey === `rehearse-${index}` && speechStatus === 'loading' ? (
+                          <>
+                            <Loader2 size={11} className="spin" /> Generating…
+                          </>
+                        ) : speakingKey === `rehearse-${index}` && speechStatus === 'playing' ? (
+                          <>
+                            <Square size={10} fill="currentColor" /> Stop
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 size={11} /> Speak
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                   <p>{message.content}</p>
                 </div>
               ))}
@@ -443,6 +687,59 @@ export default function PractiseRoom({
             <div className="chat-footer">
               Practise only — not a real person.
               {!auth && <> <button type="button" className="text-button inline-link" onClick={() => onOpenAuth?.()}>Sign in for AI replies.</button></>}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showVoiceSettings && (
+        <div className="modal-backdrop" onClick={() => setShowVoiceSettings(false)}>
+          <section className="modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <button className="modal-close" onClick={() => setShowVoiceSettings(false)}><X size={18} /></button>
+            <div className="eyebrow" style={{ color: '#4f46e5' }}>FISH AUDIO TTS INTEGRATION</div>
+            <h2 style={{ fontSize: 18, marginTop: 4, marginBottom: 8 }}>AI Voice Settings</h2>
+            <p className="small-print" style={{ marginBottom: 16 }}>
+              Fish Audio provides expressive, human-like voice synthesis for rehearsal. Leave blank to use server environment key or browser voice fallback.
+            </p>
+
+            <label style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
+              Fish Audio API Key
+              <input
+                type="password"
+                value={tempFishKey}
+                onChange={e => setTempFishKey(e.target.value)}
+                placeholder="Paste your Fish Audio API Key"
+                style={{ width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1' }}
+              />
+            </label>
+
+            <label style={{ display: 'block', marginBottom: 16, fontSize: 13 }}>
+              Reference Voice ID (optional)
+              <input
+                type="text"
+                value={tempFishVoiceId}
+                onChange={e => setTempFishVoiceId(e.target.value)}
+                placeholder="e.g. 7f92f8afb8ec43bf81429cc1c9199cb1"
+                style={{ width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1' }}
+              />
+              <span className="small-print" style={{ color: '#64748b' }}>Select or clone any voice ID from fish.audio dashboard.</span>
+            </label>
+
+            <div className="inline-actions" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="outline-button"
+                onClick={() => void playSpeechForText('Hello, this is Fish Audio speaking with your chosen voice.', 'test-voice')}
+              >
+                <Volume2 size={13} /> Test Voice
+              </button>
+              <button
+                type="button"
+                className="button"
+                onClick={handleSaveVoiceSettings}
+              >
+                Save Settings
+              </button>
             </div>
           </section>
         </div>

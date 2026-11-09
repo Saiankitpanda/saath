@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { AmbientProvider, useAmbient } from "@/components/AmbientSound";
@@ -1111,27 +1111,37 @@ function App() {
                 onBack={() => go("connect")}
                 onNotice={flash}
                 onConnect={({ peerId, peerName, mode, note, situation }) => {
-                  setStrangerMode(mode);
+                  setStrangerMode(mode === "chat" ? "chat" : "voice");
                   setStrangerNote(note);
                   saveStrangerPref({ lastPeerId: peerId, lastPeerName: peerName, situation });
                   const preview: SessionRequest = {
                     id: `near-${peerId}`,
                     providerId: peerId,
                     providerName: peerName,
-                    topic: mode === "voice" ? "Voice with a stranger" : "Chat with a stranger",
+                    topic: mode === "video" ? "Video call with a stranger" : mode === "voice" ? "Voice with a stranger" : "Chat with a stranger",
                     context: note,
-                    mode,
+                    mode: mode === "chat" ? "chat" : "voice",
                     status: "accepted",
                     createdAt: new Date().toISOString(),
                   };
                   setRequests(current => [preview, ...current.filter(item => item.id !== preview.id)]);
                   setAiChatPerson(null);
-                  setActiveCall(null);
-                  setChatRequest(preview);
+                  if (mode === "video") {
+                    setChatRequest(null);
+                    void startCall(preview.id, "video");
+                  } else if (mode === "voice") {
+                    setChatRequest(null);
+                    void startCall(preview.id, "voice");
+                  } else {
+                    setActiveCall(null);
+                    setChatRequest(preview);
+                  }
                   flash(
-                    mode === "voice"
-                      ? `Dial connected with ${peerName}. Chat holds the line for now â€” live mic joins after signup + accept.`
-                      : `Chat open with ${peerName}. Messages stay in this browser until live sync.`,
+                    mode === "video"
+                      ? `Video room opening with ${peerName}. Daily.co / Google Meet available.`
+                      : mode === "voice"
+                        ? `Voice line opening with ${peerName}.`
+                        : `Chat open with ${peerName}. Messages stay in this browser until live sync.`,
                   );
                 }}
               />

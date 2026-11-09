@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, MapPin, MessageCircle, Phone, PhoneOff, RefreshCw, Sparkles, Users } from 'lucide-react';
+import { ArrowLeft, MapPin, MessageCircle, Phone, PhoneOff, RefreshCw, Sparkles, Users, Video } from 'lucide-react';
 import { nearbyStrangerFixtures } from '@/lib/fixtures';
 import { loadStrangerPref, saveStrangerPref } from '@/lib/client/store';
 import { labelMood, type MoodKind } from '@/lib/domain';
@@ -13,7 +13,7 @@ type Props = {
   onConnect: (input: {
     peerId: string;
     peerName: string;
-    mode: 'voice' | 'chat';
+    mode: 'voice' | 'chat' | 'video';
     note: string;
     situation: string;
   }) => void;
@@ -27,7 +27,7 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
   const [radiusKm, setRadiusKm] = useState<(typeof radii)[number]>(5);
   const [situation, setSituation] = useState(pref?.situation || '');
   const [selectedId, setSelectedId] = useState<string | null>(pref?.lastPeerId || null);
-  const [mode, setMode] = useState<'voice' | 'chat'>('voice');
+  const [mode, setMode] = useState<'voice' | 'chat' | 'video'>('voice');
   const [autoPicked, setAutoPicked] = useState(false);
   const [phase, setPhase] = useState<Phase>('browse');
   const [ringSeconds, setRingSeconds] = useState(0);
@@ -105,7 +105,7 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
     onNotice(`Ready to dial ${found.name} again.`);
   }
 
-  function startDial(nextMode: 'voice' | 'chat') {
+  function startDial(nextMode: 'voice' | 'chat' | 'video') {
     if (!selected) {
       onNotice('Choose someone from the list first.');
       return;
@@ -159,10 +159,12 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
           <p>{selected.situation}</p>
           <p className="strangers-dial-status">
             {phase === 'dialing'
-              ? `Dialing ${mode === 'voice' ? 'voice' : 'chat'}… ${ringSeconds}s`
-              : mode === 'voice'
-                ? 'Connected · voice line ready'
-                : 'Connected · chat line ready'}
+              ? `Dialing ${mode === 'video' ? 'video' : mode === 'voice' ? 'voice' : 'chat'}… ${ringSeconds}s`
+              : mode === 'video'
+                ? 'Connected · HD video line ready'
+                : mode === 'voice'
+                  ? 'Connected · voice line ready'
+                  : 'Connected · chat line ready'}
           </p>
           <div className="strangers-dial-actions">
             {phase === 'dialing' ? (
@@ -185,7 +187,7 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
                     });
                   }}
                 >
-                  {mode === 'voice' ? <><Phone size={16} /> Open call</> : <><MessageCircle size={16} /> Open chat</>}
+                  {mode === 'video' ? <><Video size={16} /> Open video</> : mode === 'voice' ? <><Phone size={16} /> Open call</> : <><MessageCircle size={16} /> Open chat</>}
                 </button>
                 <button type="button" className="strangers-hangup" onClick={hangUp}>
                   <PhoneOff size={18} /> End
@@ -271,10 +273,13 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
                 </button>
                 <div className="strangers-card-dial">
                   <button type="button" className="strangers-dial-btn voice" onClick={() => { setSelectedId(item.id); startDial('voice'); }} aria-label={`Dial ${item.name}`}>
-                    <Phone size={16} /> Dial
+                    <Phone size={15} /> Voice
+                  </button>
+                  <button type="button" className="strangers-dial-btn video" onClick={() => { setSelectedId(item.id); startDial('video'); }} aria-label={`Video ${item.name}`} style={{ background: '#f0fdf4', borderColor: '#86efac', color: '#166534' }}>
+                    <Video size={15} /> Video
                   </button>
                   <button type="button" className="strangers-dial-btn chat" onClick={() => { setSelectedId(item.id); startDial('chat'); }} aria-label={`Chat ${item.name}`}>
-                    <MessageCircle size={16} /> Chat
+                    <MessageCircle size={15} /> Chat
                   </button>
                 </div>
               </article>
@@ -291,6 +296,9 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
               <div className="strangers-confirm-dial">
                 <button type="button" className="button" onClick={() => startDial('voice')}>
                   <Phone size={16} /> Dial voice
+                </button>
+                <button type="button" className="button" style={{ background: '#16a34a' }} onClick={() => startDial('video')}>
+                  <Video size={16} /> Video call
                 </button>
                 <button type="button" className="outline-button" onClick={() => startDial('chat')}>
                   <MessageCircle size={16} /> Open chat

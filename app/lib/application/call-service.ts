@@ -19,6 +19,12 @@ type VoiceConfig = { url?: string; key?: string; secret?: string };
 
 export function publicCall(record: CallRecord, actorId: OwnerId, livekit: PublicCall['livekit'] = null): PublicCall {
   const you = record.hostId === actorId ? 'host' : 'guest';
+  const roomKey = record.code.toLowerCase();
+  const dailyUrl = record.livekitRoom?.startsWith('http')
+    ? record.livekitRoom
+    : `https://meet.jit.si/saath-${roomKey}`;
+  const meetLink = 'https://meet.google.com/new?authuser=0';
+
   return {
     id: record.id,
     code: record.code,
@@ -33,6 +39,8 @@ export function publicCall(record: CallRecord, actorId: OwnerId, livekit: Public
     answer: record.guestSdp,
     remoteIce: you === 'host' ? record.guestIce : record.hostIce,
     livekit,
+    dailyUrl,
+    meetLink,
     recording: false,
   };
 }
