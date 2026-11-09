@@ -71,7 +71,7 @@ import {
 } from "lucide-react";
 
 const paths = [
-  { view: "connect" as View, n: "01", icon: MessageCircle, title: "Someone to listen.", desc: "Talk with an AI companion, or connect with a real stranger after they accept.", label: "Meet someone" },
+  { view: "connect" as View, n: "01", icon: MessageCircle, title: "Someone to listen.", desc: "Talk with Saath, or connect with a real stranger after they accept.", label: "Meet someone" },
   { view: "circles" as View, n: "02", icon: Users, title: "Peer circles.", desc: "Meet people with a similar lived experience. Discuss and post when you are ready.", label: "Join a circle" },
   { view: "chairs" as View, n: "03", icon: Armchair, title: "Two chairs.", desc: "Practise the hard conversation first, then sit with someone when you are ready.", label: "Open Two Chairs" },
 ];
@@ -938,27 +938,39 @@ function App() {
 
               <StoryMoments stories={caseStudies} />
 
-              <section className="stranger-accordion" id="strangers">
+              <section className={"stranger-accordion" + (strangerOpen ? " is-open" : "")} id="strangers">
                 <button
                   type="button"
                   className="stranger-accordion-toggle"
+                  aria-expanded={strangerOpen}
                   onClick={revealNearby}
                 >
-                  <span>
-                    <Users size={18} strokeWidth={1.5}/>
-                    <strong>Talk to a stranger</strong>
-                    <em>Nearby list Â· same situation Â· auto-match</em>
+                  <span className="stranger-accordion-lead">
+                    <span className="stranger-accordion-icon" aria-hidden="true">
+                      <Users size={20} strokeWidth={1.6}/>
+                    </span>
+                    <span className="stranger-accordion-copy">
+                      <strong>Talk to a stranger</strong>
+                      <em>Nearby list · same situation · auto-match</em>
+                    </span>
                   </span>
                   <span className="stranger-accordion-chevron">{strangerOpen ? "Matches open" : "Choose nearby"}</span>
                 </button>
-                <div className="stranger-accordion-body stranger-teaser">
+                {!strangerOpen && (
+                  <div className="stranger-accordion-body stranger-teaser">
+                    <p>
+                      Related people stay hidden until you choose a stranger nearby. They are matched to what you answered.
+                    </p>
+                    <button className="button stranger-accordion-cta" type="button" onClick={revealNearby}>
+                      Choose a stranger nearby <ArrowRight size={16}/>
+                    </button>
+                  </div>
+                )}
+                <div className="stranger-accordion-body">
                   <p className="small-print">
                     Choose someone in your radius, match with a similar situation, or reconnect later.
                     Invite-code requests still work below for people you already know.
                   </p>
-                  <button className="button" type="button" onClick={() => go("strangers")}>
-                    Choose a stranger nearby <ArrowRight size={16}/>
-                  </button>
                   <div className="two-column" style={{ marginTop: 18 }}>
                     <section className="plain-panel meet-panel">
                       <h3>Invite code (optional)</h3>

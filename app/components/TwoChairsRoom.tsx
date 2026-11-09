@@ -191,7 +191,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
           {voiceConfigured
             ? 'LiveKit is configured. A paired room can open a LiveKit call. '
             : 'Browser calling is available after a second person has actually joined. LiveKit is optional. '}
-          Text turns still work. {aiConfigured ? 'AI rehearsal is configured for the fictional chair.' : 'AI is not configured yet, so the fictional chair cannot answer.'}
+          Text turns still work. {aiConfigured ? 'Saath rehearsal is configured for the second chair.' : 'Saath is not configured yet, so the second chair cannot answer.'}
         </span>
       </div>
 
@@ -208,7 +208,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
           <h2>Connect with a person</h2>
           <p>
             Meet and greet on Listen, connect or autoconnect, then do the task in this room.
-            This tab is {actor === 'guest' ? 'Guest' : 'Seedy'}. Switch the other tab to Guest and join with the room code.
+            This tab is {actor === 'guest' ? 'Guest' : (displayName || 'Host')}. Switch the other tab to Guest and join with the room code.
           </p>
           <ol className="listen-steps">
             <li><strong>1. Meet and greet</strong><span>On Listen, choose a stranger nearby.</span></li>
@@ -217,7 +217,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
             <li className="current"><strong>4. Do the task</strong><span>Sit the steps once the other person has joined.</span></li>
           </ol>
           <div className="inline-actions">
-            <button className={actor === 'host' ? 'button' : 'outline-button'} type="button" onClick={() => switchLocalActor('host')}>This tab: Seedy</button>
+            <button className={actor === 'host' ? 'button' : 'outline-button'} type="button" onClick={() => switchLocalActor('host')}>This tab: {displayName || 'Host'}</button>
             <button className={actor === 'guest' ? 'button' : 'outline-button'} type="button" onClick={() => switchLocalActor('guest')}>This tab: Guest</button>
           </div>
         </div>
@@ -228,7 +228,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
           <div className="choice-grid">
             {([
               ['paired', 'Connect a person', 'Share a room code, or a listener pairing code. Presence waits for a real join.'],
-              ['ai', 'Fictional AI chair', 'You sit as Person A. A clearly fictional Person B answers on B steps.'],
+              ['ai', 'Saath chair', 'You sit as Person A. Saath answers as Person B on B steps.'],
             ] as [ChairSessionMode, string, string][]).map(([id, title, text]) => (
               <button type="button" key={id} className={mode === id ? 'selected' : ''} onClick={() => setMode(id)}>
                 <strong>{title}</strong>
@@ -342,10 +342,10 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
             <section className="plain-panel">
               <h2>Fictional Person B</h2>
               <p>This chair answers only on Person B steps. It does not predict a real person.</p>
-              <textarea aria-label="Message for the fictional chair" value={aiMessage} onChange={event => setAiMessage(event.target.value)} maxLength={2000} placeholder="What should Person B hear or reflect?"/>
+              <textarea aria-label="Message for Saath" value={aiMessage} onChange={event => setAiMessage(event.target.value)} maxLength={2000} placeholder="What should Person B hear or reflect?"/>
               <div className="inline-actions">
                 <button className="button" type="button" disabled={busy || !canAskAi} onClick={() => act('ai-turn', { message: aiMessage })}>
-                  Ask fictional chair <ArrowRight size={16}/>
+                  Ask Saath <ArrowRight size={16}/>
                 </button>
               </div>
               {session.aiReply && <p className="intro-preview">{session.aiReply}</p>}
