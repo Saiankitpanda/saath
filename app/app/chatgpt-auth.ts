@@ -1,5 +1,6 @@
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { verifySessionData } from "@/lib/server/session-security";
 
 export type ChatGPTUser = {
   userId: string;
@@ -14,11 +15,30 @@ const USER_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
 const USER_FULL_NAME_ENCODING_HEADER =
   "oai-authenticated-user-full-name-encoding";
 const PERCENT_ENCODED_UTF8 = "percent-encoded-utf-8";
-const SIGN_IN_PATH = "/signin-with-chatgpt";
-const SIGN_OUT_PATH = "/signout-with-chatgpt";
+const SIGN_IN_PATH = "/?view=enroll";
+const SIGN_OUT_PATH = "/";
 const CALLBACK_PATH = "/callback";
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
+  // 1. Check real Saath session cookie with HMAC security verification
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("saath_session");
+    if (sessionCookie?.value) {
+      const parsed = verifySessionData<any>(sessionCookie.value);
+      if (parsed && (parsed.id || parsed.userId || parsed.email)) {
+        return {
+          userId: parsed.id || parsed.userId || "saath-user-1",
+          displayName: parsed.fullName || parsed.displayName || parsed.email.split("@")[0],
+          email: parsed.email || "user@saath.org",
+          fullName: parsed.fullName || parsed.displayName || null,
+        };
+      }
+    }
+  } catch {
+    // Continue to headers
+  }
+
   const requestHeaders = await headers();
   const userId = requestHeaders.get(USER_ID_HEADER);
   const email = requestHeaders.get(USER_EMAIL_HEADER);

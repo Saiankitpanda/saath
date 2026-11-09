@@ -18,6 +18,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
+        <script src="https://accounts.google.com/gsi/client" async defer />
       </head>
       <body className={inter.className}>{children}</body>
     </html>

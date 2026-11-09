@@ -12,6 +12,26 @@ type Props = {
   onNotice: (message: string) => void;
 };
 
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
+  { urls: ['stun:stun.cloudflare.com:3478'] },
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelay',
+    credential: 'openrelay',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelay',
+    credential: 'openrelay',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelay',
+    credential: 'openrelay',
+  },
+];
+
 export default function CallRoom({ call, onChange, onEnded, onNotice }: Props) {
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(false);
@@ -73,7 +93,7 @@ export default function CallRoom({ call, onChange, onEnded, onNotice }: Props) {
       if (call.livekit) {
         onNotice('LiveKit is configured. This preview still uses the browser Meet-style path if the SDK is not loaded.');
       }
-      const connection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      const connection = new RTCPeerConnection({ iceServers: DEFAULT_ICE_SERVERS });
       peer.current = connection;
       media.getTracks().forEach(track => connection.addTrack(track, media));
       connection.ontrack = event => {

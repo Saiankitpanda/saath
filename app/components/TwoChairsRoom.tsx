@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { Armchair, ArrowRight, Pause, Play, ShieldCheck } from 'lucide-react';
@@ -10,7 +10,7 @@ import type { ChairSessionMode, PublicCall, PublicChair } from '@/lib/applicatio
 const chairCopy: Record<ChairStage, { title: string; text: string }> = {
   agree: { title: 'Both people agree to participate', text: 'Stay only if both of you freely agree. Either person may pass, pause, or leave.' },
   'a-speaks': { title: 'Person A speaks', text: 'Person A says what happened, how it felt, and what they need. Person B listens.' },
-  'b-reflects': { title: 'Person B reflects what they understood', text: 'Person B tries “What I’m hearing is…”. Advice can wait.' },
+  'b-reflects': { title: 'Person B reflects what they understood', text: 'Person B tries â€œWhat Iâ€™m hearing isâ€¦â€. Advice can wait.' },
   'a-clarifies': { title: 'Person A clarifies', text: 'Person A can correct, add, or pass. Then you may switch roles.' },
   switch: { title: 'Switch roles', text: 'Person B will speak next. Person A will listen.' },
   'b-speaks': { title: 'Person B speaks', text: 'Person B has the same room to speak without interruption.' },
@@ -29,9 +29,10 @@ type Props = {
   voiceConfigured: boolean;
   onNotice: (message: string) => void;
   autoOpen?: boolean;
+  onOpenAuth?: () => void;
 };
 
-export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured, voiceConfigured, onNotice, autoOpen = false }: Props) {
+export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured, voiceConfigured, onNotice, autoOpen = false, onOpenAuth }: Props) {
   const [mode, setMode] = useState<ChairSessionMode>('paired');
   const [session, setSession] = useState<PublicChair | null>(null);
   const [sessions, setSessions] = useState<PublicChair[]>([]);
@@ -76,7 +77,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
 
   async function createRoom() {
     if (!auth) {
-      window.location.href = '/signin-with-chatgpt?return_to=' + encodeURIComponent('/?view=chairs&focus=room&open=1');
+      if (onOpenAuth) { onOpenAuth(); return; } window.location.href = '/?view=enroll';
       return;
     }
     setBusy(true);
@@ -102,7 +103,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
 
   async function joinRoom() {
     if (!auth) {
-      window.location.href = '/signin-with-chatgpt?return_to=/?view=chairs';
+      if (onOpenAuth) { onOpenAuth(); return; } window.location.href = '/?view=enroll';
       return;
     }
     setBusy(true);
@@ -261,7 +262,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
                 <button type="button" className="request-row" key={row.id} onClick={() => { setSession(row); setNote(row.note); }}>
                   <div>
                     <strong>{row.code}</strong>
-                    <span>{row.mode} · {row.status} · {row.you}</span>
+                    <span>{row.mode} Â· {row.status} Â· {row.you}</span>
                   </div>
                   <span className="status-badge">{row.guestJoined ? 'Person B is here' : 'Waiting'}</span>
                 </button>
@@ -279,7 +280,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
                 <Armchair size={103} strokeWidth={1}/>
                 <span>{session.hostName || 'Person A'}</span>
               </div>
-              <div className="between-chairs"><span>✳</span><div/></div>
+              <div className="between-chairs"><span>âœ³</span><div/></div>
               <div className={speaker === 'b' || speaker === 'both' ? 'chair-seat speaking' : 'chair-seat'}>
                 <Armchair size={103} strokeWidth={1}/>
                 <span>{session.guestName || (session.mode === 'ai' ? 'Fictional chair' : 'Person B')}</span>
@@ -315,11 +316,11 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
                       ? 'The linking code is in the bar above. No one is shown in the other chair until they join.'
                       : chairCopy[stage].text}
               </p>
-              <p className="small-print">You are {session.you === 'host' ? 'Person A' : 'Person B'} · {session.mode} · {session.guestJoined ? 'Person B has joined' : 'Person B has not joined'}</p>
+              <p className="small-print">You are {session.you === 'host' ? 'Person A' : 'Person B'} Â· {session.mode} Â· {session.guestJoined ? 'Person B has joined' : 'Person B has not joined'}</p>
               <div className="chair-controls">
                 {session.status === 'waiting' && (
                   <button className="button" type="button" disabled={busy || (session.mode === 'paired' && !session.guestJoined)} onClick={() => act('start')}>
-                    We’re ready <ArrowRight size={17}/>
+                    Weâ€™re ready <ArrowRight size={17}/>
                   </button>
                 )}
                 {session.status === 'active' && (
@@ -355,7 +356,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
             <section className="plain-panel">
               <h2>A thought to keep</h2>
               <p>Saved on this room and encrypted at rest when the server key is set. The server can still decrypt it for you.</p>
-              <textarea placeholder="One thing I want to remember…" value={note} onChange={event => setNote(event.target.value)} maxLength={2000}/>
+              <textarea placeholder="One thing I want to rememberâ€¦" value={note} onChange={event => setNote(event.target.value)} maxLength={2000}/>
               <button className="text-button" type="button" disabled={busy} onClick={() => act('note', { note })}>Save note</button>
             </section>
             <section className="plain-panel">

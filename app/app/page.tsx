@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { AmbientProvider, useAmbient } from "@/components/AmbientSound";
@@ -17,6 +17,10 @@ import StoryMoments from "@/components/StoryMoments";
 import CheckInNudge from "@/components/CheckInNudge";
 import StrangersNearby from "@/components/StrangersNearby";
 import ProfileHome from "@/components/ProfileHome";
+import AppearanceEditor from "@/components/AppearanceEditor";
+import AuthModal from "@/components/AuthModal";
+import CrisisModal from "@/components/CrisisModal";
+import MoodRelaxationCard from "@/components/MoodRelaxationCard";
 import { SaathCharacter } from "@/components/SaathCharacter";
 import CharacterWait from "@/components/CharacterWait";
 import { api } from "@/lib/client/api";
@@ -41,6 +45,7 @@ import {
   type InterestId,
   type IntroAnswers,
   type MoodEntry,
+  type MoodKind,
   type Person,
   type SessionRequest,
   type View,
@@ -56,9 +61,12 @@ import {
   Phone,
   Plus,
   ShieldCheck,
+  ShieldAlert,
   Sparkles,
   Users,
   UserRound,
+  LogIn,
+  LogOut,
   X,
 } from "lucide-react";
 
@@ -73,6 +81,9 @@ function App() {
   const [view, setView] = useState<View>("home");
   const [mobile, setMobile] = useState(false);
   const [auth, setAuth] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalRole, setAuthModalRole] = useState<EnrollmentRole>("client");
+  const [crisisOpen, setCrisisOpen] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [profile, setProfile] = useState<EnrollmentProfile | null>(null);
   const [incoming, setIncoming] = useState<SessionRequest[]>([]);
@@ -112,6 +123,7 @@ function App() {
   const [introDone, setIntroDone] = useState(false);
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [moods, setMoods] = useState<MoodEntry[]>([]);
+  const [userMood, setUserMood] = useState<MoodKind | null>(null);
   const [interests, setInterests] = useState<InterestId[]>([]);
   const [reflections, setReflections] = useState("");
   const [conversation, setConversation] = useState<ConversationRecord | null>(null);
@@ -130,6 +142,14 @@ function App() {
     setReflections(fixtures.reflections || fixtures.quietThoughts);
     setBlocks(fixtures.blocks);
     setConversation(fixtures.conversations[0] ?? null);
+    try {
+      const storedMood = localStorage.getItem("saath_current_mood") as MoodKind | null;
+      if (storedMood) {
+        setUserMood(storedMood);
+      } else if (fixtures.moods && fixtures.moods.length > 0) {
+        setUserMood(fixtures.moods[0].mood);
+      }
+    } catch {}
     const appearance = loadAppearance(null);
     setMotionEnabled(appearance.motionEnabled);
     restoreAppliedAppearance(null);
@@ -214,6 +234,28 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!auth) return undefined;
+    const interval = window.setInterval(() => {
+      api<{ requests?: SessionRequest[]; incoming?: SessionRequest[] }>("/api/requests")
+        .then(res => {
+          if (res.incoming) {
+            setIncoming(curr => {
+              if (res.incoming && res.incoming.length > curr.length) {
+                flash("You have a new incoming connection request!");
+              }
+              return res.incoming || [];
+            });
+          }
+          if (res.requests) {
+            setRequests(res.requests);
+          }
+        })
+        .catch(() => {});
+    }, 4000);
+    return () => window.clearInterval(interval);
+  }, [auth]);
+
+  useEffect(() => {
     if (!selected && !modal) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -244,19 +286,19 @@ function App() {
     setSelected(null);
     setPractiseSeed({
       situation: person.specialty || "Just need to talk",
-      story: `${person.name} · ${person.intro}\nI want to talk about: ${person.quote}`,
+      story: `${person.name} Â· ${person.intro}\nI want to talk about: ${person.quote}`,
       goal: `Talk about ${person.specialty.toLowerCase()}`,
     });
     setChairsFocus("practise");
     go("chairs");
-    flash(`${person.name} is a fictional AI companion. Describe your scenario under Two chairs → Practise, then rehearse. No video with AI.`);
+    flash(`${person.name} is a fictional AI companion. Describe your scenario under Two chairs â†’ Practise, then rehearse. No video with AI.`);
   }
 
   function dmWithPersona(person: Person) {
     setActiveCall(null);
     setChatRequest(null);
     setAiChatPerson(person);
-    flash(`DM with ${person.name} is open. Fictional companion — not a live person.`);
+    flash(`DM with ${person.name} is open. Fictional companion â€” not a live person.`);
   }
   function askForPerson() {
     setStrangerOpen(true);
@@ -282,7 +324,7 @@ function App() {
       setActiveCall(result.call);
       setChatRequest(null);
       flash(media === "video"
-        ? "Video room is ringing. Camera stays off until you Join — Meet-style browser call."
+        ? "Video room is ringing. Camera stays off until you Join â€” Meet-style browser call."
         : "Voice room is ringing. Microphone stays off until you Join.");
     } catch (error) {
       flash((error as Error).message);
@@ -292,9 +334,77 @@ function App() {
   }
 
 
+  function handleAuthSuccess(user: {
+    id: string;
+    email: string;
+    fullName?: string;
+    displayName?: string;
+    activeRole?: EnrollmentRole;
+    pairingCode?: string;
+    initialMood?: MoodKind;
+    initialReflection?: string;
+  }) {
+    setAuth(true);
+    const name = user.fullName || user.displayName || user.email.split("@")[0] || "User";
+    setDisplayName(name);
+    setProfile({
+      displayName: name,
+      clientEnrolled: true,
+      listenerEnrolled: user.activeRole === "listener",
+      activeRole: user.activeRole || "client",
+      pairingCode: user.pairingCode || null,
+      updatedAt: new Date().toISOString(),
+    });
+
+    if (user.initialMood) {
+      setUserMood(user.initialMood);
+      try {
+        localStorage.setItem("saath_current_mood", user.initialMood);
+      } catch {}
+
+      const noteText = user.initialReflection || `Arrived feeling ${user.initialMood}`;
+      setMoods(current => [
+        {
+          id: `mood-${Date.now()}`,
+          mood: user.initialMood!,
+          note: noteText,
+          createdAt: new Date().toISOString(),
+        },
+        ...current,
+      ]);
+
+      if (user.initialReflection) {
+        setReflections(curr => (curr ? `${user.initialReflection}\n---\n${curr}` : user.initialReflection!));
+        saveReflections(user.initialReflection);
+      }
+    }
+
+    flash(`Welcome, ${name}. Your calm sanctuary is ready below.`);
+    go("home");
+  }
+
+  async function handleSignOut() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {}
+    setAuth(false);
+    setDisplayName("");
+    setProfile(null);
+    setContext("");
+    setUserMood(null);
+    try {
+      localStorage.removeItem("saath_current_mood");
+    } catch {}
+    setRequests([]);
+    setIncoming([]);
+    flash("You have been signed out.");
+    go("home");
+  }
+
   async function enroll(input: { clientEnrolled: boolean; listenerEnrolled: boolean; activeRole: EnrollmentRole; displayName: string }) {
     if (!auth) {
-      window.location.href = `/signin-with-chatgpt?return_to=/?enroll=${input.activeRole}`;
+      setAuthModalRole(input.activeRole);
+      setAuthModalOpen(true);
       return;
     }
     setBusy(true);
@@ -504,7 +614,7 @@ function App() {
       />
       {appBooting && (
         <div className="app-boot-overlay">
-          <CharacterWait kind="app" message="Getting your space ready…" motionEnabled={motionEnabled} />
+          <CharacterWait kind="app" message="Getting your space readyâ€¦" motionEnabled={motionEnabled} />
         </div>
       )}
       <header className="header">
@@ -516,18 +626,69 @@ function App() {
           <button className={view === "chairs" ? "active" : ""} onClick={() => { setChairsFocus("practise"); go("chairs"); }}>Two chairs</button>
         </nav>
         <div className="header-actions">
-          {profile && (profile.clientEnrolled || profile.listenerEnrolled) ? (
-            <div className="role-switch" role="group" aria-label="Active role">
-              {profile.clientEnrolled && (
-                <button className={profile.activeRole === "client" ? "active" : ""} onClick={() => switchRole("client")}>{ROLE_LABELS.client.short}</button>
-              )}
-              {profile.listenerEnrolled && (
-                <button className={profile.activeRole === "listener" ? "active" : ""} onClick={() => switchRole("listener")}>{ROLE_LABELS.listener.short}</button>
-              )}
+          <button
+            type="button"
+            onClick={() => setCrisisOpen(true)}
+            title="Need immediate crisis support or emergency helpline?"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "7px 12px",
+              borderRadius: 20,
+              border: "1px solid #fecaca",
+              background: "#fef2f2",
+              color: "#b91c1c",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <ShieldAlert size={14} color="#dc2626" />
+            <span className="hide-mobile">In Crisis?</span>
+          </button>
+          {auth ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              {profile && (profile.clientEnrolled || profile.listenerEnrolled) ? (
+                <div className="role-switch" role="group" aria-label="Active role">
+                  {profile.clientEnrolled && (
+                    <button className={profile.activeRole === "client" ? "active" : ""} onClick={() => switchRole("client")}>{ROLE_LABELS.client.short}</button>
+                  )}
+                  {profile.listenerEnrolled && (
+                    <button className={profile.activeRole === "listener" ? "active" : ""} onClick={() => switchRole("listener")}>{ROLE_LABELS.listener.short}</button>
+                  )}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="button small"
+                onClick={handleSignOut}
+                title="Sign out of this session"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: "#ffffff",
+                  background: "#475569",
+                  minHeight: 36,
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <LogOut size={14} color="#ffffff" style={{ color: "#ffffff", stroke: "#ffffff" }} />
+                <span className="hide-mobile" style={{ color: "#ffffff", fontWeight: 500 }}>Sign Out</span>
+              </button>
             </div>
           ) : (
-            <button className="button small" onClick={() => go("enroll")}>
-              {auth ? "Enroll" : "Sign in"}
+            <button
+              type="button"
+              className="button small"
+              onClick={() => { setAuthModalRole("client"); setAuthModalOpen(true); }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <LogIn size={15}/> <span>Sign in</span>
             </button>
           )}
           <button
@@ -544,24 +705,68 @@ function App() {
 
       {view === "home" ? (
         <main>
+          {userMood && (
+            <MoodRelaxationCard
+              mood={userMood}
+              userName={displayName}
+              initialNote={moods[0]?.note}
+              onMoodChange={(nextMood) => {
+                setUserMood(nextMood);
+                try {
+                  localStorage.setItem("saath_current_mood", nextMood);
+                } catch {}
+                setMoods(curr => [
+                  {
+                    id: `mood-${Date.now()}`,
+                    mood: nextMood,
+                    note: `Updated feeling: ${nextMood}`,
+                    createdAt: new Date().toISOString(),
+                  },
+                  ...curr,
+                ]);
+                flash(`Your calm sanctuary has been tuned for feeling ${nextMood}.`);
+              }}
+              onSaveReflection={(note, m) => {
+                setMoods(curr => [
+                  {
+                    id: `mood-${Date.now()}`,
+                    mood: m,
+                    note,
+                    createdAt: new Date().toISOString(),
+                  },
+                  ...curr,
+                ]);
+                setReflections(curr => (curr ? `${note}\n---\n${curr}` : note));
+                saveReflections(note);
+                flash("Your quiet reflection is saved in My Space.");
+              }}
+              onNavigate={(dest) => go(dest as View)}
+              onDismiss={() => {
+                setUserMood(null);
+                try {
+                  localStorage.removeItem("saath_current_mood");
+                } catch {}
+              }}
+            />
+          )}
           <section className="hero">
             <div className="hero-copy">
-              <div className="eyebrow"><span/> EARLY PREVIEW · 18+</div>
+              <div className="eyebrow"><span/> EARLY PREVIEW Â· 18+</div>
               <h1>A little space.<br/>A little <em>Saath.</em></h1>
-              <p className="hero-description">Talk to someone. Practise what’s hard to say.</p>
+              <p className="hero-description">Talk to someone. Practise whatâ€™s hard to say.</p>
               <div className="hero-actions">
                 <button className="button" onClick={() => go(profile ? "arrive" : "enroll")}>
                   {profile ? "Continue your visit" : "Enroll or sign in"} <ArrowRight size={18}/>
                 </button>
                 <button className="text-button" onClick={() => go("connect")}>Listen</button>
               </div>
-              <div className="language-note"><Globe size={14}/> English <span>·</span> हिन्दी <span>·</span> Hinglish</div>
-              <div className="hero-footnote"><span className="tiny-flower">✳</span> Adults 18+. No perfect words needed.</div>
+              <div className="language-note"><Globe size={14}/> English <span>Â·</span> à¤¹à¤¿à¤¨à¥à¤¦à¥€ <span>Â·</span> Hinglish</div>
+              <div className="hero-footnote"><span className="tiny-flower">âœ³</span> Adults 18+. No perfect words needed.</div>
             </div>
             <div className="hero-art">
               <div className="art-backdrop"/>
               <img src="/assets/saath-garden-hero.png" alt="A quiet garden courtyard with two empty chairs and soft natural light"/>
-              <div className="conversation-note"><span>You can start with…</span><p>“I don’t know<br/>where to begin.”</p><span className="note-line"/></div>
+              <div className="conversation-note"><span>You can start withâ€¦</span><p>â€œI donâ€™t know<br/>where to begin.â€</p><span className="note-line"/></div>
               <div className="art-caption"><span className="small-dot"/> Two chairs. Room to arrive slowly.</div>
             </div>
             <svg className="thread" viewBox="0 0 400 120" aria-hidden="true"><path d="M0 95 C95 140 230 15 200 20 C150 28 195 120 400 0"/></svg>
@@ -602,6 +807,11 @@ function App() {
               profile={profile}
               busy={busy}
               onEnroll={enroll}
+              onOpenAuthModal={(role) => {
+                setAuthModalRole(role);
+                setAuthModalOpen(true);
+              }}
+              onSignOut={handleSignOut}
             />
           )}
 
@@ -697,7 +907,7 @@ function App() {
                 </div>
                 <div className="listen-hero-veil" aria-hidden="true" />
                 <div className="listen-hero-copy">
-                  <div className="eyebrow">LISTEN · THEN ACT</div>
+                  <div className="eyebrow">LISTEN Â· THEN ACT</div>
                   <h1>A quiet companion<br/>when you need to <em>speak.</em></h1>
                   <p>Choose a stranger nearby when you are ready. People who fit what you answered appear only after that.</p>
                   <div className="listen-hero-actions">
@@ -737,20 +947,79 @@ function App() {
                   <span>
                     <Users size={18} strokeWidth={1.5}/>
                     <strong>Talk to a stranger</strong>
-                    <em>Nearby list · same situation · auto-match</em>
+                    <em>Nearby list Â· same situation Â· auto-match</em>
                   </span>
                   <span className="stranger-accordion-chevron">{strangerOpen ? "Matches open" : "Choose nearby"}</span>
                 </button>
-                {!strangerOpen && (
-                  <div className="stranger-accordion-body stranger-teaser">
-                    <p className="small-print">
-                      Related people stay hidden until you choose a stranger nearby. They are matched to what you answered.
-                    </p>
-                    <button className="button" type="button" onClick={revealNearby}>
-                      Choose a stranger nearby <ArrowRight size={16}/>
-                    </button>
+                <div className="stranger-accordion-body stranger-teaser">
+                  <p className="small-print">
+                    Choose someone in your radius, match with a similar situation, or reconnect later.
+                    Invite-code requests still work below for people you already know.
+                  </p>
+                  <button className="button" type="button" onClick={() => go("strangers")}>
+                    Choose a stranger nearby <ArrowRight size={16}/>
+                  </button>
+                  <div className="two-column" style={{ marginTop: 18 }}>
+                    <section className="plain-panel meet-panel">
+                      <h3>Invite code (optional)</h3>
+                      <label htmlFor="stranger-note">What you'd like them to know
+                        <textarea id="stranger-note" value={strangerNote} onChange={event => setStrangerNote(event.target.value)} maxLength={500} rows={3}/>
+                      </label>
+                      <label htmlFor="pairing-code">Their invite code
+                        <input id="pairing-code" value={pairingCode} onChange={event => setPairingCode(event.target.value.toUpperCase())} maxLength={6} placeholder="AB23CD"/>
+                      </label>
+                      <div className="meet-mode-grid stranger-mode-grid" role="radiogroup" aria-label="Stranger connection mode">
+                        {([
+                          ["voice", "Voice", Phone],
+                          ["chat", "Chat", MessageCircle],
+                        ] as ["voice" | "chat", string, typeof Phone][]).map(([id, title, Icon]) => (
+                          <button
+                            key={id}
+                            type="button"
+                            role="radio"
+                            aria-checked={strangerMode === id}
+                            className={"meet-mode-card" + (strangerMode === id ? " selected" : "")}
+                            onClick={() => setStrangerMode(id)}
+                          >
+                            <Icon size={18} strokeWidth={1.4}/>
+                            <strong>{title}</strong>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="inline-actions">
+                        <button className="button" type="button" disabled={busy || pairingCode.trim().length !== 6} onClick={connectStranger}>
+                          {busy ? "Sending..." : strangerMode === "chat" ? "Ask to chat" : "Ask for voice"}
+                        </button>
+                      </div>
+                      {!auth && <button type="button" className="text-button" onClick={() => setAuthModalOpen(true)}>Sign in first</button>}
+                    </section>
+                    <section className="plain-panel meet-panel">
+                      <h3>If you companion</h3>
+                      {profile?.pairingCode ? (
+                        <p className="pairing-code">Your invite code <strong>{profile.pairingCode}</strong></p>
+                      ) : (
+                        <button className="text-button" type="button" onClick={() => go("enroll")}>Enroll as a {ROLE_LABELS.listener.short}</button>
+                      )}
+                      {incoming.length ? incoming.map(item => (
+                        <div className="request-row" key={item.id}>
+                          <div><strong>{item.topic}</strong><span>{item.status}</span></div>
+                          {item.status === "pending" && profile?.listenerEnrolled && (
+                            <div className="inline-actions">
+                              <button className="quiet" type="button" disabled={busy} onClick={() => actOnIncoming(item.id, "accept")}>Accept</button>
+                              <button className="quiet" type="button" disabled={busy} onClick={() => actOnIncoming(item.id, "decline")}>Decline</button>
+                            </div>
+                          )}
+                          {item.status === "accepted" && (
+                            <div className="inline-actions">
+                              <button className="quiet" type="button" disabled={busy} onClick={() => void startCall(item.id, "voice")}>Join voice</button>
+                              <button className="quiet" type="button" onClick={() => { setActiveCall(null); setAiChatPerson(null); setChatRequest(item); }}>Open DM</button>
+                            </div>
+                          )}
+                        </div>
+                      )) : <p className="small-print">No requests yet.</p>}
+                    </section>
                   </div>
-                )}
+                </div>
               </section>
 
               {strangerOpen && (
@@ -771,11 +1040,11 @@ function App() {
                           <div className="request-row" key={item.id}>
                             <div>
                               <strong>{item.name}</strong>
-                              <span>{item.situation} · {item.distanceKm} km</span>
+                              <span>{item.situation} Â· {item.distanceKm} km</span>
                             </div>
                           </div>
                         ))}
-                        {!serverStrangers.length && <p className="small-print">Loading people…</p>}
+                        {!serverStrangers.length && <p className="small-print">Loading peopleâ€¦</p>}
                       </div>
                     </li>
                     <li className={listenStep === "connect" || listenStep === "auto" ? "current" : ""}>
@@ -861,7 +1130,7 @@ function App() {
                   setChatRequest(preview);
                   flash(
                     mode === "voice"
-                      ? `Dial connected with ${peerName}. Chat holds the line for now — live mic joins after signup + accept.`
+                      ? `Dial connected with ${peerName}. Chat holds the line for now â€” live mic joins after signup + accept.`
                       : `Chat open with ${peerName}. Messages stay in this browser until live sync.`,
                   );
                 }}
@@ -984,7 +1253,7 @@ function App() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} Saath · An early, private preview</span>
+          <span>Â© {new Date().getFullYear()} Saath Â· An early, private preview</span>
           <p>For adults 18+. Peer support and AI rehearsal are not emergency services or a substitute for professional care. End-to-end encryption is not claimed.</p>
         </div>
       </footer>
@@ -999,19 +1268,19 @@ function App() {
                 <div className="appearance-preview-art" style={{ marginBottom: 12 }}>
                   <SaathCharacter name={selected.characterKey || "mira"} size={120} alt="" />
                 </div>
-                <h2 id="modal-title">{selected.name} · {selected.specialty}</h2>
+                <h2 id="modal-title">{selected.name} Â· {selected.specialty}</h2>
                 <p>{SAMPLE_PROFILE_NOTICE} Domain: {selected.domain}.</p>
-                <p className="small-print">Choosing {selected.name} changes only the AI persona — never your human identity. Connect here, then work the conversation together.</p>
+                <p className="small-print">Choosing {selected.name} changes only the AI persona â€” never your human identity. Connect here, then work the conversation together.</p>
                 <label>How would you like to be supported?<select value={support} onChange={event => setSupport(event.target.value)}><option>Listen only</option><option>Help me reflect</option><option>Offer suggestions</option></select></label>
-                <p className="small-print">Modes: Message{voiceConfigured ? " · Voice" : ""} · no video with AI.</p>
-                <label>Context to include<textarea value={context} onChange={event => setContext(event.target.value)} maxLength={4000} placeholder="Only what you want this personality to hear…"/></label>
+                <p className="small-print">Modes: Message{voiceConfigured ? " Â· Voice" : ""} Â· no video with AI.</p>
+                <label>Context to include<textarea value={context} onChange={event => setContext(event.target.value)} maxLength={4000} placeholder="Only what you want this personality to hearâ€¦"/></label>
                 <button className="button full" onClick={() => { setListenStep("connect"); setSelected(null); dmWithPersona(selected); }}>Connect with {selected.name}<ArrowRight size={17}/></button>
                 <button className="outline-button" onClick={() => { setListenStep("task"); setSelected(null); talkWithPersona(selected); }}>Work with {selected.name}</button>
-                <button className="outline-button" onClick={() => { setSelected(null); askForPerson(); }}>I’d rather talk with a person</button>
+                <button className="outline-button" onClick={() => { setSelected(null); askForPerson(); }}>Iâ€™d rather talk with a person</button>
                 <label className="checkbox-label"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)}/> I understand this is a sample request only, not a live person.</label>
-                <button className="quiet" disabled={!consent || busy} onClick={requestPerson}>{busy ? "Saving…" : "Save a sample request anyway"}</button>
+                <button className="quiet" disabled={!consent || busy} onClick={requestPerson}>{busy ? "Savingâ€¦" : "Save a sample request anyway"}</button>
                 <button className="quiet" onClick={() => setBlocks(toggleBlock(selected.id))}>{blocks.includes(selected.id) ? "Unblock in this browser" : "Block in this browser"}</button>
-                {!auth && <a className="sign-in-link" href="/signin-with-chatgpt?return_to=/">Sign in to save requests</a>}
+                {!auth && <button type="button" className="sign-in-link text-button" onClick={() => { setModal(null); setAuthModalOpen(true); }}>Sign in to save requests</button>}
               </>
             )}
             {modal === "approach" && (
@@ -1028,7 +1297,7 @@ function App() {
               <>
                 <div className="eyebrow">CLEAR BOUNDARIES</div>
                 <h2 id="modal-title">Your story belongs to you.</h2>
-                <p>AI personalities are fictional. Unsaved writing stays in this tab. Signed-in context and requests are stored on Vinext/D1 and access is limited to their owner. Context can be encrypted at rest when configured — that is not end-to-end encryption.</p>
+                <p>AI personalities are fictional. Unsaved writing stays in this tab. Signed-in context and requests are stored on Vinext/D1 and access is limited to their owner. Context can be encrypted at rest when configured â€” that is not end-to-end encryption.</p>
                 <p>AI rehearsal only sends text after you opt in. Browser voice calling exists between two enrolled people after a request is accepted (Two Chairs / calls API). There is no call recording, and end-to-end encryption is not claimed.</p>
                 <p>You can delete your context from the profile icon. Previously viewed content cannot be unremembered by a person who already saw it.</p>
                 <button className="button full" onClick={() => { setModal(null); go("profile"); }}>Manage my context <ArrowRight size={17}/></button>
@@ -1062,6 +1331,20 @@ function App() {
           </section>
         </div>
       )}
+
+      {authModalOpen && (
+        <AuthModal
+          isOpen={authModalOpen}
+          initialRole={authModalRole}
+          onClose={() => setAuthModalOpen(false)}
+          onAuthSuccess={handleAuthSuccess}
+        />
+      )}
+
+      <CrisisModal
+        isOpen={crisisOpen}
+        onClose={() => setCrisisOpen(false)}
+      />
     </div>
   );
 }

@@ -18,8 +18,17 @@ export async function user() {
 }
 export function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
-  if (!origin || origin !== new URL(request.url).origin) throw new HttpError(403, 'This request must come from Saath.');
-  if (!request.headers.get('content-type')?.includes('application/json') && request.method !== 'DELETE') throw new HttpError(415, 'Send JSON content.');
+  if (origin) {
+    const reqOrigin = new URL(request.url).origin;
+    const isLocal = (origin.includes('127.0.0.1') || origin.includes('localhost')) &&
+                    (reqOrigin.includes('127.0.0.1') || reqOrigin.includes('localhost'));
+    if (origin !== reqOrigin && !isLocal) {
+      throw new HttpError(403, 'This request must come from Saath.');
+    }
+  }
+  if (!request.headers.get('content-type')?.includes('application/json') && request.method !== 'DELETE') {
+    throw new HttpError(415, 'Send JSON content.');
+  }
 }
 export async function body<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
   const raw = await request.text();

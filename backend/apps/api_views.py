@@ -25,6 +25,40 @@ def get_current_user(request):
     x-user-id / x-user-email headers, or query parameters.
     Falls back to the first client user if no header is supplied.
     """
+    session_cookie = request.COOKIES.get("saath_session")
+    if session_cookie:
+        try:
+            import urllib.parse
+            import base64
+            raw = urllib.parse.unquote(session_cookie).strip()
+            cookie_json = None
+            if raw.startswith("{") and raw.endswith("}"):
+                cookie_json = json.loads(raw)
+            elif "." in raw:
+                dot_idx = raw.rfind(".")
+                b64_part = raw[:dot_idx]
+                rem = len(b64_part) % 4
+                if rem:
+                    b64_part += "=" * (4 - rem)
+                decoded_str = base64.urlsafe_b64decode(b64_part.encode("utf-8")).decode("utf-8")
+                cookie_json = json.loads(decoded_str)
+            else:
+                cookie_json = json.loads(raw)
+
+            if cookie_json and isinstance(cookie_json, dict):
+                c_email = cookie_json.get("email")
+                c_id = cookie_json.get("id") or cookie_json.get("userId")
+                if c_id:
+                    u = UserProfile.objects.filter(id=c_id).first()
+                    if u:
+                        return u
+                if c_email:
+                    u = UserProfile.objects.filter(email__iexact=c_email.strip()).first()
+                    if u:
+                        return u
+        except Exception:
+            pass
+
     user_id = request.headers.get("x-user-id") or request.GET.get("user_id")
     email = request.headers.get("x-user-email") or request.GET.get("email")
     auth_header = request.headers.get("Authorization", "")
@@ -774,7 +808,7 @@ def requests_api(request):
     GET /api/requests/ -> List user's session requests
     POST /api/requests/ -> Create a new session request
     """
-    client = get_active_client()
+    client = get_current_user(request)
 
     if request.method == "POST":
         try:
@@ -870,7 +904,7 @@ def moods_api(request):
     GET /api/moods/ -> List user's mood check-ins
     POST /api/moods/ -> Log a new mood check-in
     """
-    client = get_active_client()
+    client = get_current_user(request)
 
     if request.method == "POST":
         try:

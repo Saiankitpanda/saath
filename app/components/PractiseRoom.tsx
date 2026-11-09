@@ -14,6 +14,7 @@ type Props = {
   privateContext: string;
   onPrivateContextChange: (value: string) => void;
   onNotice: (message: string) => void;
+  onOpenAuth?: () => void;
   seed?: {
     situation?: string;
     story?: string;
@@ -28,6 +29,7 @@ export default function PractiseRoom({
   onPrivateContextChange,
   onNotice,
   seed = null,
+  onOpenAuth,
 }: Props) {
   const [scenario, setScenario] = useState(seed?.situation || 'Setting a boundary');
   const [scenarioStory, setScenarioStory] = useState(seed?.story || '');
@@ -326,7 +328,7 @@ export default function PractiseRoom({
               </span>
               {!auth && (
                 <p className="small-print">
-                  <a href="/signin-with-chatgpt?return_to=/?view=chairs&focus=practise">Sign in</a> when you want live AI replies.
+                  <button type="button" className="text-button inline-link" onClick={() => onOpenAuth?.()}>Sign in</button> when you want live AI replies.
                 </p>
               )}
             </div>
@@ -440,7 +442,7 @@ export default function PractiseRoom({
             </form>
             <div className="chat-footer">
               Practise only — not a real person.
-              {!auth && <> <a href="/signin-with-chatgpt?return_to=/?view=chairs&focus=practise">Sign in for AI replies.</a></>}
+              {!auth && <> <button type="button" className="text-button inline-link" onClick={() => onOpenAuth?.()}>Sign in for AI replies.</button></>}
             </div>
           </section>
         </div>

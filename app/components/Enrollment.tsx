@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Ear, HeartHandshake, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Ear, HeartHandshake, MessageCircle, Phone, ShieldCheck, LogOut } from 'lucide-react';
 import { ROLE_LABELS, type EnrollmentProfile, type EnrollmentRole } from '@/lib/domain';
 
 type Props = {
@@ -9,9 +9,11 @@ type Props = {
   profile: EnrollmentProfile | null;
   busy: boolean;
   onEnroll: (input: { clientEnrolled: boolean; listenerEnrolled: boolean; activeRole: EnrollmentRole; displayName: string }) => void;
+  onOpenAuthModal?: (role: EnrollmentRole) => void;
+  onSignOut?: () => void;
 };
 
-export default function Enrollment({ auth, displayName, profile, busy, onEnroll }: Props) {
+export default function Enrollment({ auth, displayName, profile, busy, onEnroll, onOpenAuthModal, onSignOut }: Props) {
   const enrolled = Boolean(profile?.clientEnrolled || profile?.listenerEnrolled);
   const seeker = ROLE_LABELS.client;
   const companion = ROLE_LABELS.listener;
@@ -19,17 +21,17 @@ export default function Enrollment({ auth, displayName, profile, busy, onEnroll 
   return (
     <>
       <div className="page-heading">
-        <div className="eyebrow">SEEKER OR COMPANION. SAME ACCOUNT.</div>
-        <h1>One ChatGPT sign-in.<br/><em>Two ways to show up.</em></h1>
+        <div className="eyebrow">SEEKER OR COMPANION · ONE SHARED SANCTUARY</div>
+        <h1>One calm account.<br/><em>Two ways to show up.</em></h1>
         <p>
-          Enroll as a {seeker.short}, a {companion.short}, or both on the same identity. No second password.
-          After enroll you can talk with an AI companion by voice or DM, or ask a stranger for voice or chat — only when both people accept.
+          Enroll as a {seeker.short} to express yourself, a {companion.short} to hold space for others, or both on the same account.
+          No second password. Connect securely with an AI companion by voice or DM, or request a verified stranger when you are ready.
         </p>
       </div>
       {!auth && (
         <div className="sample-notice">
           <ShieldCheck size={18}/>
-          <span>Choose a role, then continue with ChatGPT. Your enrollment saves after sign-in.</span>
+          <span>Choose how you want to show up. You can switch or add the other role anytime after signing in.</span>
         </div>
       )}
       <div className="enroll-grid">
@@ -50,19 +52,32 @@ export default function Enrollment({ auth, displayName, profile, busy, onEnroll 
             <span><MessageCircle size={14}/> DM</span>
           </div>
           {auth ? (
-            <button className="button full" disabled={busy || Boolean(profile?.clientEnrolled)} onClick={() => onEnroll({
-              clientEnrolled: true,
-              listenerEnrolled: Boolean(profile?.listenerEnrolled),
-              activeRole: 'client',
-              displayName,
-            })}>
+            <button
+              type="button"
+              className="button full"
+              disabled={busy || Boolean(profile?.clientEnrolled)}
+              onClick={() => onEnroll({
+                clientEnrolled: true,
+                listenerEnrolled: Boolean(profile?.listenerEnrolled),
+                activeRole: 'client',
+                displayName,
+              })}
+            >
               {profile?.clientEnrolled ? `Enrolled as ${seeker.short}` : `Enroll as ${seeker.short}`}
               <ArrowRight size={16}/>
             </button>
           ) : (
-            <a className="button full" href="/signin-with-chatgpt?return_to=/?enroll=client">Enroll as {seeker.short} <ArrowRight size={16}/></a>
+            <button
+              type="button"
+              className="button full"
+              disabled={busy}
+              onClick={() => onOpenAuthModal ? onOpenAuthModal('client') : undefined}
+            >
+              Enroll as {seeker.short} <ArrowRight size={16}/>
+            </button>
           )}
         </article>
+
         <article className="enroll-card listener">
           <div className="enroll-card-top">
             <span className="enroll-icon listener-icon"><Ear size={26} strokeWidth={1.4}/></span>
@@ -80,34 +95,70 @@ export default function Enrollment({ auth, displayName, profile, busy, onEnroll 
             <span><MessageCircle size={14}/> DM</span>
           </div>
           {auth ? (
-            <button className="button full" disabled={busy || Boolean(profile?.listenerEnrolled)} onClick={() => onEnroll({
-              clientEnrolled: Boolean(profile?.clientEnrolled),
-              listenerEnrolled: true,
-              activeRole: 'listener',
-              displayName,
-            })}>
+            <button
+              type="button"
+              className="button full"
+              disabled={busy || Boolean(profile?.listenerEnrolled)}
+              onClick={() => onEnroll({
+                clientEnrolled: Boolean(profile?.clientEnrolled),
+                listenerEnrolled: true,
+                activeRole: 'listener',
+                displayName,
+              })}
+            >
               {profile?.listenerEnrolled ? `Enrolled as ${companion.short}` : `Enroll as ${companion.short}`}
               <ArrowRight size={16}/>
             </button>
           ) : (
-            <a className="button full" href="/signin-with-chatgpt?return_to=/?enroll=listener">Enroll as {companion.short} <ArrowRight size={16}/></a>
+            <button
+              type="button"
+              className="button full"
+              disabled={busy}
+              onClick={() => onOpenAuthModal ? onOpenAuthModal('listener') : undefined}
+            >
+              Enroll as {companion.short} <ArrowRight size={16}/>
+            </button>
           )}
         </article>
       </div>
+
       {enrolled && (
-        <section className="plain-panel enroll-sync">
-          <h2>Saved on this account</h2>
-          <p>
-            {profile?.displayName || 'You'} ·
-            {profile?.clientEnrolled ? ` ${seeker.short}` : ''}
-            {profile?.clientEnrolled && profile?.listenerEnrolled ? ' and' : ''}
-            {profile?.listenerEnrolled ? ` ${companion.short}` : ''}
-            {profile?.activeRole ? ` · using ${ROLE_LABELS[profile.activeRole].short} now` : ''}
-          </p>
-          {profile?.pairingCode && (
-            <p className="pairing-code">Your invite code <strong>{profile.pairingCode}</strong></p>
+        <section className="plain-panel enroll-sync" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h2>Saved on this account</h2>
+            <p>
+              {profile?.displayName || 'You'} ·
+              {profile?.clientEnrolled ? ` ${seeker.short}` : ''}
+              {profile?.clientEnrolled && profile?.listenerEnrolled ? ' and' : ''}
+              {profile?.listenerEnrolled ? ` ${companion.short}` : ''}
+              {profile?.activeRole ? ` · using ${ROLE_LABELS[profile.activeRole].short} now` : ''}
+            </p>
+            {profile?.pairingCode && (
+              <p className="pairing-code">Your invite code <strong>{profile.pairingCode}</strong></p>
+            )}
+            <p className="small-print">Switching roles updates the same saved profile. It does not create a second login.</p>
+          </div>
+          {onSignOut && (
+            <button
+              type="button"
+              className="button small"
+              onClick={onSignOut}
+              style={{
+                color: '#ffffff',
+                background: '#475569',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <LogOut size={15} color="#ffffff" style={{ color: '#ffffff', stroke: '#ffffff' }} />
+              <span style={{ color: '#ffffff', fontWeight: 500 }}>Sign Out</span>
+            </button>
           )}
-          <p className="small-print">Switching roles updates the same saved profile. It does not create a second login.</p>
         </section>
       )}
     </>
