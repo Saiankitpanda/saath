@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Lock, Mail, User, AlertCircle, CheckCircle2, Sparkles, HeartHandshake, Ear, Check } from 'lucide-react';
+import { X, Lock, Mail, User, AlertCircle, CheckCircle2, HeartHandshake, Ear, Check } from 'lucide-react';
 import type { EnrollmentRole, MoodKind } from '@/lib/domain';
+import AnimatedMoodFace from '@/components/AnimatedMoodFace';
 
 type Props = {
   isOpen: boolean;
@@ -78,16 +79,53 @@ export default function AuthModal({ isOpen, initialRole = 'client', onClose, onA
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
+    function applyGoogleUser(user: any) {
+      if (!user) return;
+      setPendingUser(user);
+      setSuccessMsg(`Signed in with Google (${user.email})!`);
+      setBusy(false);
+      setModalStep('mood');
+    }
+
     function handleOAuthMessage(event: MessageEvent) {
       if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data?.user) {
-        setPendingUser(event.data.user);
-        setSuccessMsg(`Signed in with Google (${event.data.user.email})!`);
-        setBusy(false);
-        setModalStep('mood');
+        applyGoogleUser(event.data.user);
       }
     }
+
+    function handleStorageEvent(event: StorageEvent) {
+      if (event.key === 'saath_oauth_result' && event.newValue) {
+        try {
+          const parsed = JSON.parse(event.newValue);
+          if (parsed.user) {
+            applyGoogleUser(parsed.user);
+          }
+        } catch {}
+      }
+    }
+
     window.addEventListener('message', handleOAuthMessage);
-    return () => window.removeEventListener('message', handleOAuthMessage);
+    window.addEventListener('storage', handleStorageEvent);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('saath_oauth_channel');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data?.user) {
+            applyGoogleUser(event.data.user);
+          }
+        };
+      } catch {}
+    }
+
+    return () => {
+      window.removeEventListener('message', handleOAuthMessage);
+      window.removeEventListener('storage', handleStorageEvent);
+      if (bc) {
+        try { bc.close(); } catch {}
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -148,7 +186,8 @@ export default function AuthModal({ isOpen, initialRole = 'client', onClose, onA
     if (provider === 'google') {
       const activeClientId =
         process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-        (typeof window !== 'undefined' ? localStorage.getItem('saath_google_client_id') : null);
+        (typeof window !== 'undefined' ? localStorage.getItem('saath_google_client_id') : null) ||
+        '362814342163-e49h23jnjmq73htbisgakl8doj54da9j.apps.googleusercontent.com';
 
       const w = 500;
       const h = 600;
@@ -253,24 +292,6 @@ export default function AuthModal({ isOpen, initialRole = 'client', onClose, onA
     }
   }
 
-  function quickDemo(demoEmail: string, demoName: string, demoRole: EnrollmentRole) {
-    setBusy(true);
-    setErrorMsg('');
-    const user = {
-      id: `demo-${demoRole}-1`,
-      email: demoEmail,
-      fullName: demoName,
-      displayName: demoName,
-      activeRole: demoRole,
-      clientEnrolled: true,
-      listenerEnrolled: demoRole === 'listener',
-      pairingCode: demoRole === 'listener' ? 'SAATH-7749' : undefined,
-    };
-    setPendingUser(user);
-    setBusy(false);
-    setModalStep('mood');
-  }
-
   return (
     <div
       style={{
@@ -320,9 +341,20 @@ export default function AuthModal({ isOpen, initialRole = 'client', onClose, onA
             <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b' }}>
               {modalStep === 'mood' ? 'WELCOME TO SAATH · CALM SANCTUARY' : 'SAATH SECURE ACCESS'}
             </div>
-            <h2 id="auth-modal-title" style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', margin: 0, marginTop: 2 }}>
+            <h2
+              id="auth-modal-title"
+              style={{
+                fontSize: modalStep === 'mood' ? '1.45rem' : '1.25rem',
+                fontFamily: modalStep === 'mood' ? "Georgia, 'Times New Roman', serif" : 'inherit',
+                fontWeight: 700,
+                color: '#1e293b',
+                margin: 0,
+                marginTop: 2,
+                letterSpacing: modalStep === 'mood' ? '-0.02em' : 'normal',
+              }}
+            >
               {modalStep === 'mood'
-                ? 'How is your heart today?'
+                ? 'How is your Mood today?'
                 : tab === 'signin'
                 ? 'Sign In to Saath'
                 : 'Create an Account'}
@@ -353,12 +385,12 @@ export default function AuthModal({ isOpen, initialRole = 'client', onClose, onA
           {/* STEP 2: MOOD & CALM SANCTUARY QUESTION */}
           {modalStep === 'mood' ? (
             <div>
-              <p style={{ fontSize: '0.88rem', color: '#64748b', marginTop: 0, marginBottom: '1rem', lineHeight: 1.5 }}>
+              <p style={{ fontSize: '0.88rem', color: '#64748b', marginTop: 0, marginBottom: '1.15rem', lineHeight: 1.5 }}>
                 Choose how you feel right now. You can answer the quiet question below to shape your calm space before entering.
               </p>
 
-              {/* 5 Mood Pills */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: '1.25rem' }}>
+              {/* 5 Animated Emoji Mood Pills */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: '1.25rem' }}>
                 {(['heavy', 'restless', 'tender', 'unsure', 'steady'] as MoodKind[]).map((m) => {
                   const item = MOOD_DATA[m];
                   const isSelected = selectedMood === m;
@@ -367,22 +399,26 @@ export default function AuthModal({ isOpen, initialRole = 'client', onClose, onA
                       key={m}
                       type="button"
                       onClick={() => setSelectedMood(m)}
+                      aria-pressed={isSelected}
+                      className={`mood-button mood-button-${m} ${isSelected ? 'selected' : ''}`}
                       style={{
-                        padding: '10px 4px',
-                        borderRadius: 12,
+                        padding: '10px 4px 8px',
+                        borderRadius: 14,
                         border: isSelected ? '2px solid #526b86' : '1px solid #e2e8f0',
                         background: isSelected ? '#f1f6fa' : '#ffffff',
                         textAlign: 'center',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
-                        gap: 4,
+                        gap: 6,
                         cursor: 'pointer',
-                        transition: 'all 0.15s ease',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: isSelected ? '0 6px 16px rgba(82, 107, 134, 0.2)' : 'none',
+                        transform: isSelected ? 'translateY(-2px)' : 'none',
                       }}
                     >
-                      <span style={{ fontSize: 22 }}>{item.icon}</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: isSelected ? 700 : 500, color: isSelected ? '#1e293b' : '#64748b' }}>
+                      <AnimatedMoodFace mood={m} size={isSelected ? 42 : 38} animated={true} />
+                      <span style={{ fontSize: '0.74rem', fontWeight: isSelected ? 700 : 500, color: isSelected ? '#1e293b' : '#64748b' }}>
                         {item.label}
                       </span>
                     </button>
@@ -401,7 +437,7 @@ export default function AuthModal({ isOpen, initialRole = 'client', onClose, onA
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '1px', color: '#526b86', textTransform: 'uppercase' }}>
-                  <Sparkles size={13} color="#526b86" />
+                  <AnimatedMoodFace mood={selectedMood} size={16} />
                   <span>Calm Sanctuary Question · {MOOD_DATA[selectedMood].label}</span>
                 </div>
 
@@ -494,7 +530,9 @@ export default function AuthModal({ isOpen, initialRole = 'client', onClose, onA
                     <Ear size={18} color="#0284c7" />
                   )}
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-                    {role === 'client' ? 'Enrolling as Seeker' : 'Enrolling as Companion'}
+                    {tab === 'signin'
+                      ? role === 'client' ? 'Signing in as Seeker' : 'Signing in as Companion'
+                      : role === 'client' ? 'Enrolling as Seeker' : 'Enrolling as Companion'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
@@ -719,7 +757,7 @@ export default function AuthModal({ isOpen, initialRole = 'client', onClose, onA
                       <User size={16} style={{ position: 'absolute', left: 10, top: 11, color: '#94a3b8' }} />
                       <input
                         type="text"
-                        placeholder="e.g. Ankit Sharma"
+                        placeholder="Enter your full name"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         style={{ width: '100%', padding: '0.6rem 0.75rem 0.6rem 2.25rem', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
@@ -772,33 +810,6 @@ export default function AuthModal({ isOpen, initialRole = 'client', onClose, onA
                   {busy ? 'Processing…' : tab === 'signin' ? 'Sign In & Check In Mood' : 'Next: Check in your mood'}
                 </button>
               </form>
-
-              {/* Quick Demo Instant Access */}
-              <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
-                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Sparkles size={13} color="#f59e0b" /> One-Click Demo Access
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="button small quiet"
-                    disabled={busy}
-                    onClick={() => quickDemo('aarav@saath.org', 'Aarav (Seeker)', 'client')}
-                    style={{ flex: 1, fontSize: '0.78rem' }}
-                  >
-                    Seeker (Aarav)
-                  </button>
-                  <button
-                    type="button"
-                    className="button small quiet"
-                    disabled={busy}
-                    onClick={() => quickDemo('meera@saath.org', 'Meera (Companion)', 'listener')}
-                    style={{ flex: 1, fontSize: '0.78rem' }}
-                  >
-                    Companion (Meera)
-                  </button>
-                </div>
-              </div>
             </>
           )}
         </div>

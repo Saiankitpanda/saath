@@ -261,7 +261,7 @@ export default function NeedAMoment({ go, enrolled, onPhrasePreview }: Props) {
                 <div className="moment-connect-grid">
                   <button type="button" onClick={() => leaveTo('strangers')}>
                     <Phone size={18} strokeWidth={1.5} />
-                    <strong>Talk to a stranger</strong>
+                    <strong>Talk to a companion</strong>
                     <span>Nearby people, same situation — voice or chat.</span>
                   </button>
                   <button type="button" onClick={() => leaveTo('connect')}>

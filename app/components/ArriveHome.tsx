@@ -60,7 +60,7 @@ export default function ArriveHome({
     {
       view: 'strangers' as View,
       icon: Phone,
-      title: 'Dial a stranger',
+      title: 'Dial a companion',
       text: 'Nearby people, same situation — voice or chat without a waiting lobby.',
     },
     {
@@ -102,7 +102,7 @@ export default function ArriveHome({
           <div className="eyebrow">YOUR VISIT</div>
           <h1>You arrived.<br/>Start where you <em>are.</em></h1>
           <p>
-            Talk with a Companion or stranger, sit with peers, or practise hard words first.
+            Talk with a Companion, sit with peers, or practise hard words first.
             Nothing has to happen all at once.
           </p>
           <div className="arrive-identity">
@@ -145,12 +145,12 @@ export default function ArriveHome({
           <>
             <h2>No live person is waiting yet.</h2>
             <p>
-              Dial a stranger nearby, or talk with {suggested.name} while you warm up.
+              Connect with a companion nearby, or talk with {suggested.name} while you warm up.
               <span className="arrive-ai-note"> {SAMPLE_PROFILE_NOTICE}</span>
             </p>
             <div className="inline-actions">
               <button type="button" className="button" onClick={onAskForPerson}>
-                <Users size={16} /> Talk to a stranger
+                <Users size={16} /> Talk to a companion
               </button>
               <button type="button" className="outline-button" onClick={() => onTalkWithPersona(suggested)}>
                 Talk with {suggested.name}

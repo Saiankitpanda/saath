@@ -27,17 +27,39 @@ export default function GoogleOAuthCallback() {
           });
           const data = (await res.json()) as any;
           if (data.user) {
-            if (window.opener) {
-              window.opener.postMessage(
-                { type: "GOOGLE_AUTH_SUCCESS", user: data.user },
-                window.location.origin
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage(
+                  { type: "GOOGLE_AUTH_SUCCESS", user: data.user },
+                  "*"
+                );
+              }
+            } catch {}
+
+            try {
+              if (typeof BroadcastChannel !== "undefined") {
+                const bc = new BroadcastChannel("saath_oauth_channel");
+                bc.postMessage({ type: "GOOGLE_AUTH_SUCCESS", user: data.user });
+                bc.close();
+              }
+            } catch {}
+
+            try {
+              localStorage.setItem(
+                "saath_oauth_result",
+                JSON.stringify({ user: data.user, timestamp: Date.now() })
               );
+              document.cookie = `saath_session=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=2592000; SameSite=Lax`;
+            } catch {}
+
+            try {
               window.close();
-              return;
-            } else {
+            } catch {}
+
+            setTimeout(() => {
               window.location.href = "/";
-              return;
-            }
+            }, 300);
+            return;
           }
         }
         setStatus("Could not verify Google account. Please try again.");

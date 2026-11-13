@@ -4,13 +4,14 @@ Clean, decoupled architecture for clinical counseling, anonymous peer support,
 and AI-assisted crisis triage.
 """
 
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "counselor-ai-mental-health-platform-secret-key-production-grade"
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "counselor-ai-mental-health-platform-secret-key-production-grade")
+DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() in ("true", "1")
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",") if h.strip()]
 
 INSTALLED_APPS = [
     # Core Django System

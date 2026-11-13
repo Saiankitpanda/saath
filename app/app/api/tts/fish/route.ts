@@ -56,6 +56,7 @@ export async function POST(request: Request) {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        model: 's2.1-pro-free',
       },
       body: JSON.stringify({
         text: sanitizedText,

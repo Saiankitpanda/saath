@@ -21,9 +21,8 @@ from apps.peer_connect.models import CompatibilityAssessment, CommunityRoom, Cli
 
 def get_current_user(request):
     """
-    Resolves the current authenticated user from Authorization header,
-    x-user-id / x-user-email headers, or query parameters.
-    Falls back to the first client user if no header is supplied.
+    Resolves the authenticated user from the session cookie or Authorization Bearer token.
+    Returns None if unauthenticated. Never silently impersonates or creates users.
     """
     session_cookie = request.COOKIES.get("saath_session")
     if session_cookie:
@@ -32,9 +31,7 @@ def get_current_user(request):
             import base64
             raw = urllib.parse.unquote(session_cookie).strip()
             cookie_json = None
-            if raw.startswith("{") and raw.endswith("}"):
-                cookie_json = json.loads(raw)
-            elif "." in raw:
+            if "." in raw:
                 dot_idx = raw.rfind(".")
                 b64_part = raw[:dot_idx]
                 rem = len(b64_part) % 4
@@ -42,43 +39,37 @@ def get_current_user(request):
                     b64_part += "=" * (4 - rem)
                 decoded_str = base64.urlsafe_b64decode(b64_part.encode("utf-8")).decode("utf-8")
                 cookie_json = json.loads(decoded_str)
+            elif raw.startswith("{") and raw.endswith("}"):
+                cookie_json = json.loads(raw)
             else:
                 cookie_json = json.loads(raw)
 
             if cookie_json and isinstance(cookie_json, dict):
-                c_email = cookie_json.get("email")
                 c_id = cookie_json.get("id") or cookie_json.get("userId")
+                c_email = cookie_json.get("email")
                 if c_id:
                     u = UserProfile.objects.filter(id=c_id).first()
                     if u:
                         return u
                 if c_email:
-                    u = UserProfile.objects.filter(email__iexact=c_email.strip()).first()
+                    u = UserProfile.objects.filter(email__iexact=str(c_email).strip()).first()
                     if u:
                         return u
         except Exception:
             pass
 
-    user_id = request.headers.get("x-user-id") or request.GET.get("user_id")
-    email = request.headers.get("x-user-email") or request.GET.get("email")
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header.replace("Bearer ", "").strip()
-        if token and len(token) >= 32:
-            user_id = token
+        if token:
+            try:
+                u = UserProfile.objects.filter(id=token).first()
+                if u:
+                    return u
+            except Exception:
+                pass
 
-    if user_id:
-        try:
-            return UserProfile.objects.filter(id=user_id).first() or get_active_client()
-        except Exception:
-            pass
-
-    if email:
-        user = UserProfile.objects.filter(email__iexact=email.strip()).first()
-        if user:
-            return user
-
-    return get_active_client()
+    return None
 
 
 def get_active_client():
@@ -168,29 +159,25 @@ def immediately_baat_triage_api(request):
     user_msg = data.get("message", "").strip()
     mood = data.get("mood", "Overwhelmed")
 
-    client = UserProfile.objects.filter(user_type="CLIENT").first()
-    if not client:
-        client = UserProfile.objects.create(
-            full_name="Aarav Sharma", email="client@counselor.ai", preferred_language="English"
+    user = get_current_user(request)
+
+    # Persist Mood Check-in only if authenticated
+    if user:
+        MoodCheckIn.objects.create(
+            user=user,
+            mood_level=8,
+            mood_label="DISTRESSED" if any(w in user_msg.lower() for w in ["hurt", "breakup", "cry", "pain"]) else "ANXIOUS",
+            trigger_description=f"Mood: {mood} | Shared: {user_msg[:200]}",
+            ai_acknowledgment_response="Active clinical empathy listener responded with calming grounding."
         )
 
-    # Persist Mood Check-in
-    MoodCheckIn.objects.create(
-        user=client,
-        mood_level=8,
-        mood_label="DISTRESSED" if any(w in user_msg.lower() for w in ["hurt", "breakup", "cry", "pain"]) else "ANXIOUS",
-        trigger_description=f"Mood: {mood} | Client shared: {user_msg[:200]}",
-        ai_acknowledgment_response="Active clinical empathy listener responded with calming grounding."
-    )
-
-    # Persist Chat Message
-    CounselorChatMessage.objects.create(
-        user=client,
-        role="user",
-        content=user_msg,
-        engine_routed="empathy_listener",
-        context_snapshot={"mood": mood, "language": "English"}
-    )
+        CounselorChatMessage.objects.create(
+            user=user,
+            role="user",
+            content=user_msg,
+            engine_routed="empathy_listener",
+            context_snapshot={"mood": mood, "language": "English"}
+        )
 
     # Empathetic English Clinical Response Generator
     lower = user_msg.lower()
@@ -220,14 +207,15 @@ def immediately_baat_triage_api(request):
             f"Would you like to tell me more, or would you like to connect directly with a licensed counselor online now?"
         )
 
-    # Save AI response
-    CounselorChatMessage.objects.create(
-        user=client,
-        role="assistant",
-        content=ai_reply,
-        engine_routed="empathy_listener",
-        context_snapshot={"mood": mood, "language": "English"}
-    )
+    # Save AI response only if authenticated
+    if user:
+        CounselorChatMessage.objects.create(
+            user=user,
+            role="assistant",
+            content=ai_reply,
+            engine_routed="empathy_listener",
+            context_snapshot={"mood": mood, "language": "English"}
+        )
 
     return JsonResponse({
         "status": "success",
@@ -262,39 +250,39 @@ def get_trauma_feed_api(request):
 def react_trauma_story_api(request, story_id):
     """
     POST /api/trauma-feed/<story_id>/react/
-    Increments silent empathy reaction without storing toxic comments.
+    Increments silent empathy reaction atomically.
     """
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
 
     try:
+        from django.db.models import F
         story = TraumaStory.objects.filter(id=story_id).first()
         if story:
-            story.support_reaction_count += 1
-            story.save(update_fields=["support_reaction_count"])
+            TraumaStory.objects.filter(id=story_id).update(support_reaction_count=F("support_reaction_count") + 1)
+            story.refresh_from_db(fields=["support_reaction_count"])
             return JsonResponse({
                 "status": "success",
                 "new_count": story.support_reaction_count,
                 "message": "Silent empathy registered"
             })
-    except Exception:
-        pass
-
-    return JsonResponse({
-        "status": "success",
-        "new_count": 143,
-        "message": "Silent empathy registered"
-    })
+        return JsonResponse({"error": "Story not found"}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 @csrf_exempt
 def post_trauma_story_api(request):
     """
     POST /api/trauma-feed/create/
-    Anonymously posts a new vulnerability story (strictly read-only).
+    Posts a new vulnerability story (strictly requires authentication).
     """
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
+
+    user = get_current_user(request)
+    if not user:
+        return JsonResponse({"error": "Authentication required to share a story", "status": "unauthorized"}, status=401)
 
     try:
         data = json.loads(request.body.decode("utf-8"))
@@ -307,11 +295,10 @@ def post_trauma_story_api(request):
     if not content:
         return JsonResponse({"error": "Content cannot be empty"}, status=400)
 
-    author = UserProfile.objects.filter(user_type="CLIENT").first()
     alias = f"BraveSoul_{random.randint(1000, 9999)}"
 
     story = TraumaStory.objects.create(
-        author=author,
+        author=user,
         content=content,
         category=category if category in ["ANXIETY", "GRIEF", "RELATIONSHIP", "LONELINESS", "WORKPLACE", "FAMILY"] else "OTHER",
         language="English",
@@ -724,6 +711,8 @@ def profile_api(request):
     PUT/PATCH /api/profile/ -> Updates user profile / active role
     """
     client = get_current_user(request)
+    if not client:
+        return JsonResponse({"error": "Authentication required", "status": "unauthorized"}, status=401)
 
     if request.method in ["PUT", "PATCH"]:
         try:
@@ -769,6 +758,9 @@ def context_api(request):
     DELETE /api/context/ -> Wipe context & reflections
     """
     client = get_current_user(request)
+    if not client:
+        return JsonResponse({"error": "Authentication required", "status": "unauthorized"}, status=401)
+
     ctx, _ = UserContext.objects.get_or_create(user=client)
 
     if request.method == "DELETE":
@@ -809,6 +801,8 @@ def requests_api(request):
     POST /api/requests/ -> Create a new session request
     """
     client = get_current_user(request)
+    if not client:
+        return JsonResponse({"error": "Authentication required", "status": "unauthorized"}, status=401)
 
     if request.method == "POST":
         try:
@@ -865,6 +859,10 @@ def request_action_api(request, request_id):
     if request.method not in ["PATCH", "POST"]:
         return JsonResponse({"error": "PATCH or POST required"}, status=405)
 
+    user = get_current_user(request)
+    if not user:
+        return JsonResponse({"error": "Authentication required", "status": "unauthorized"}, status=401)
+
     try:
         data = json.loads(request.body.decode("utf-8"))
     except Exception:
@@ -874,6 +872,12 @@ def request_action_api(request, request_id):
     req_obj = SessionRequest.objects.filter(id=request_id).first()
     if not req_obj:
         return JsonResponse({"error": "Request not found"}, status=404)
+
+    # Permission check: user must be either client or provider
+    is_client = req_obj.client == user
+    is_provider = str(req_obj.provider_id) == str(user.id) or req_obj.provider_id == getattr(user, "pairing_code", "")
+    if not (is_client or is_provider):
+        return JsonResponse({"error": "Permission denied for this request"}, status=403)
 
     if action == "accept":
         req_obj.status = "accepted"
@@ -905,6 +909,8 @@ def moods_api(request):
     POST /api/moods/ -> Log a new mood check-in
     """
     client = get_current_user(request)
+    if not client:
+        return JsonResponse({"error": "Authentication required", "status": "unauthorized"}, status=401)
 
     if request.method == "POST":
         try:
@@ -1112,9 +1118,9 @@ def auth_login_api(request):
         else:
             return JsonResponse({"status": "error", "message": "No account found with this email. Please create an account."}, status=404)
 
-    # Validate password if user has password_hash, or allow initial demo password
+    # Validate password
     if user.password_hash:
-        if not user.check_password(password) and password != "SaathSecure2026!" and password != "demo123":
+        if not user.check_password(password):
             return JsonResponse({"status": "error", "message": "Incorrect password. Please try again."}, status=401)
     else:
         # User has no password set yet (e.g. seeded account), set it on first login

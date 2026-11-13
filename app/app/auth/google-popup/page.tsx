@@ -4,10 +4,8 @@ import { useState, useEffect } from "react";
 
 export default function GoogleOAuthPopup() {
   const [role, setRole] = useState("client");
-  const [selectedEmail, setSelectedEmail] = useState("");
   const [customEmail, setCustomEmail] = useState("");
   const [customName, setCustomName] = useState("");
-  const [showCustom, setShowCustom] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -26,18 +24,43 @@ export default function GoogleOAuthPopup() {
       });
       const data = (await res.json()) as any;
       if (data.user) {
-        if (window.opener) {
-          window.opener.postMessage(
-            { type: "GOOGLE_AUTH_SUCCESS", user: data.user },
-            window.location.origin
+        // 1. Post to opener if available
+        try {
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage(
+              { type: "GOOGLE_AUTH_SUCCESS", user: data.user },
+              "*"
+            );
+          }
+        } catch {}
+
+        // 2. Broadcast via BroadcastChannel across all tabs
+        try {
+          if (typeof BroadcastChannel !== "undefined") {
+            const bc = new BroadcastChannel("saath_oauth_channel");
+            bc.postMessage({ type: "GOOGLE_AUTH_SUCCESS", user: data.user });
+            bc.close();
+          }
+        } catch {}
+
+        // 3. Fallback broadcast via LocalStorage
+        try {
+          localStorage.setItem(
+            "saath_oauth_result",
+            JSON.stringify({ user: data.user, timestamp: Date.now() })
           );
+          document.cookie = `saath_session=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=2592000; SameSite=Lax`;
+        } catch {}
+
+        // 4. Close popup, or redirect to home if not in popup
+        try {
           window.close();
-          return;
-        } else {
-          // If not in a popup, redirect to home
+        } catch {}
+
+        setTimeout(() => {
           window.location.href = "/";
-          return;
-        }
+        }, 300);
+        return;
       }
     } catch (err) {
       alert("Authentication failed: " + (err as Error).message);
@@ -111,7 +134,7 @@ export default function GoogleOAuthPopup() {
             margin: "0 0 24px 0",
           }}
         >
-          Choose an account to continue to <strong>Saath</strong>
+          to continue to <strong>Saath</strong>
         </p>
 
         {loading ? (
@@ -132,225 +155,82 @@ export default function GoogleOAuthPopup() {
           </div>
         ) : (
           <div>
-            {!showCustom ? (
-              <div style={{ borderTop: "1px solid #dadce0" }}>
-                {/* Account Item 1 */}
-                <button
-                  type="button"
-                  onClick={() => handleSelectAccount("ankit.sharma@gmail.com", "Ankit Sharma")}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (customEmail.trim()) {
+                  handleSelectAccount(customEmail.trim(), customName.trim() || customEmail.split("@")[0]);
+                }
+              }}
+              style={{ display: "flex", flexDirection: "column", gap: 16 }}
+            >
+              <div>
+                <label style={{ display: "block", fontSize: "0.85rem", color: "#202124", fontWeight: 500, marginBottom: 8 }}>
+                  Email or phone
+                </label>
+                <input
+                  type="email"
+                  required
+                  autoFocus
+                  placeholder="Enter your Google account email"
+                  value={customEmail}
+                  onChange={(e) => setCustomEmail(e.target.value)}
                   style={{
                     width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 16,
-                    padding: "12px 8px",
-                    background: "transparent",
-                    border: "none",
-                    borderBottom: "1px solid #f1f3f4",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "background 0.15s",
+                    padding: "13px 14px",
+                    borderRadius: 4,
+                    border: "1px solid #dadce0",
+                    fontSize: "1rem",
+                    boxSizing: "border-box",
+                    outlineColor: "#1a73e8",
+                    color: "#202124",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f9fa")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      backgroundColor: "#7c3aed",
-                      color: "#ffffff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 600,
-                      fontSize: "1.1rem",
-                    }}
-                  >
-                    A
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500, fontSize: "0.95rem", color: "#3c4043" }}>
-                      Ankit Sharma
-                    </div>
-                    <div style={{ fontSize: "0.85rem", color: "#5f6368" }}>ankit.sharma@gmail.com</div>
-                  </div>
-                </button>
+                />
+              </div>
 
-                {/* Account Item 2 */}
-                <button
-                  type="button"
-                  onClick={() => handleSelectAccount("priya.patel@gmail.com", "Priya Patel")}
+              <div>
+                <label style={{ display: "block", fontSize: "0.85rem", color: "#5f6368", marginBottom: 6 }}>
+                  Full name (optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Your full name"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
                   style={{
                     width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 16,
-                    padding: "12px 8px",
-                    background: "transparent",
-                    border: "none",
-                    borderBottom: "1px solid #f1f3f4",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "background 0.15s",
+                    padding: "12px 14px",
+                    borderRadius: 4,
+                    border: "1px solid #dadce0",
+                    fontSize: "0.95rem",
+                    boxSizing: "border-box",
+                    outlineColor: "#1a73e8",
+                    color: "#202124",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f9fa")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      backgroundColor: "#059669",
-                      color: "#ffffff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 600,
-                      fontSize: "1.1rem",
-                    }}
-                  >
-                    P
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500, fontSize: "0.95rem", color: "#3c4043" }}>
-                      Priya Patel
-                    </div>
-                    <div style={{ fontSize: "0.85rem", color: "#5f6368" }}>priya.patel@gmail.com</div>
-                  </div>
-                </button>
+                />
+              </div>
 
-                {/* Use another account option */}
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginTop: 8 }}>
                 <button
-                  type="button"
-                  onClick={() => setShowCustom(true)}
+                  type="submit"
                   style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 16,
-                    padding: "14px 8px",
-                    background: "transparent",
+                    backgroundColor: "#1a73e8",
+                    color: "#ffffff",
                     border: "none",
-                    borderBottom: "1px solid #dadce0",
+                    borderRadius: 4,
+                    padding: "10px 28px",
+                    fontSize: "0.92rem",
+                    fontWeight: 500,
                     cursor: "pointer",
-                    textAlign: "left",
-                    transition: "background 0.15s",
+                    boxShadow: "0 1px 2px rgba(60,64,67,0.3)",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f8f9fa")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                 >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      backgroundColor: "#f1f3f4",
-                      color: "#5f6368",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "1.2rem",
-                    }}
-                  >
-                    +
-                  </div>
-                  <div style={{ fontWeight: 500, fontSize: "0.95rem", color: "#1a73e8" }}>
-                    Use another Google account
-                  </div>
+                  Next
                 </button>
               </div>
-            ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (customEmail) handleSelectAccount(customEmail, customName || customEmail.split("@")[0]);
-                }}
-                style={{ display: "flex", flexDirection: "column", gap: 14 }}
-              >
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", color: "#5f6368", marginBottom: 6 }}>
-                    Email or phone
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    autoFocus
-                    placeholder="Enter your Google email"
-                    value={customEmail}
-                    onChange={(e) => setCustomEmail(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: 4,
-                      border: "1px solid #dadce0",
-                      fontSize: "1rem",
-                      boxSizing: "border-box",
-                      outlineColor: "#1a73e8",
-                    }}
-                  />
-                </div>
+            </form>
 
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", color: "#5f6368", marginBottom: 6 }}>
-                    Full name (optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Your name"
-                    value={customName}
-                    onChange={(e) => setCustomName(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: 4,
-                      border: "1px solid #dadce0",
-                      fontSize: "1rem",
-                      boxSizing: "border-box",
-                      outlineColor: "#1a73e8",
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowCustom(false)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#1a73e8",
-                      fontSize: "0.9rem",
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                  >
-                    ← Back to account list
-                  </button>
-
-                  <button
-                    type="submit"
-                    style={{
-                      backgroundColor: "#1a73e8",
-                      color: "#ffffff",
-                      border: "none",
-                      borderRadius: 4,
-                      padding: "10px 24px",
-                      fontSize: "0.9rem",
-                      fontWeight: 500,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Next
-                  </button>
-                </div>
-              </form>
-            )}
-
-            <div style={{ marginTop: 24, fontSize: "0.78rem", color: "#5f6368", lineHeight: 1.5 }}>
+            <div style={{ marginTop: 24, fontSize: "0.78rem", color: "#5f6368", lineHeight: 1.5, borderTop: "1px solid #f1f3f4", paddingTop: 16 }}>
               To continue, Google will share your name, email address, language preference, and profile
               picture with <strong>Saath</strong>.
             </div>

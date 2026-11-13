@@ -18,10 +18,37 @@ import { D1RequestRepository } from '../infrastructure/d1-request-repository.ts'
 import { D1UsageRepository } from '../infrastructure/d1-usage-repository.ts';
 import { EncryptedContextRepository, EncryptedRequestRepository } from '../infrastructure/encrypted-repositories.ts';
 import { OpenAICompatibleGateway } from '../infrastructure/openai-compatible-gateway.ts';
+import {
+  MemoryCallRepository,
+  MemoryChairRepository,
+  MemoryContextRepository,
+  MemoryProfileRepository,
+  MemoryReportRepository,
+  MemoryRequestRepository,
+  MemoryUsageRepository,
+} from '../infrastructure/memory.ts';
+import type {
+  CallRepository,
+  ChairRepository,
+  ContextRepository,
+  ProfileRepository,
+  ReportRepository,
+  RequestRepository,
+  UsageRepository,
+} from '../application/ports.ts';
 import { aiReady } from './ai.ts';
 import { voiceConfig, voiceReady } from './voice.ts';
 
 type EncryptionEnv = { CONTEXT_ENCRYPTION_KEY?: string };
+
+// Shared fallback memory repositories for local development and non-Cloudflare environments
+const memoryContext = new MemoryContextRepository();
+const memoryRequests = new MemoryRequestRepository();
+const memoryProfiles = new MemoryProfileRepository();
+const memoryReports = new MemoryReportRepository();
+const memoryUsage = new MemoryUsageRepository();
+const memoryChairs = new MemoryChairRepository();
+const memoryCalls = new MemoryCallRepository();
 
 export function createCipher() {
   return createFieldCipher((env as unknown as EncryptionEnv).CONTEXT_ENCRYPTION_KEY);
@@ -54,13 +81,38 @@ export function backendCapabilities() {
 
 export function createServices() {
   const cipher = createCipher();
-  const profiles = new D1ProfileRepository();
+  let profiles: ProfileRepository;
+  let requestRepository: RequestRepository;
+  let contextRepository: ContextRepository;
+  let callRepository: CallRepository;
+  let chairRepository: ChairRepository;
+  let reportRepository: ReportRepository;
+  let usageRepository: UsageRepository;
+
+  try {
+    profiles = new D1ProfileRepository();
+    requestRepository = new EncryptedRequestRepository(new D1RequestRepository(), cipher);
+    contextRepository = new EncryptedContextRepository(new D1ContextRepository(), cipher);
+    callRepository = new D1CallRepository();
+    chairRepository = new D1ChairRepository();
+    reportRepository = new D1ReportRepository();
+    usageRepository = new D1UsageRepository();
+  } catch {
+    profiles = memoryProfiles;
+    requestRepository = new EncryptedRequestRepository(memoryRequests, cipher);
+    contextRepository = new EncryptedContextRepository(memoryContext, cipher);
+    callRepository = memoryCalls;
+    chairRepository = memoryChairs;
+    reportRepository = memoryReports;
+    usageRepository = memoryUsage;
+  }
+
   const model = new OpenAICompatibleGateway();
-  const rehearsal = new RehearsalService(model, new D1UsageRepository());
-  const calls = new CallService(new D1CallRepository(), voiceConfig());
-  const requestRepository = new EncryptedRequestRepository(new D1RequestRepository(), cipher);
+  const rehearsal = new RehearsalService(model, usageRepository);
+  const calls = new CallService(callRepository, voiceConfig());
+
   return {
-    context: new ContextService(new EncryptedContextRepository(new D1ContextRepository(), cipher)),
+    context: new ContextService(contextRepository),
     requests: new RequestService(
       requestRepository,
       Date.now,
@@ -68,12 +120,12 @@ export function createServices() {
       profiles,
     ),
     strangers: new StrangerService(requestRepository, calls),
-    reports: new ReportService(new D1ReportRepository()),
+    reports: new ReportService(reportRepository),
     rehearsal,
     wording: new WordingService(model),
     profiles: new ProfileService(profiles),
     chairs: new ChairService(
-      new D1ChairRepository(),
+      chairRepository,
       cipher,
       profiles,
       rehearsal,

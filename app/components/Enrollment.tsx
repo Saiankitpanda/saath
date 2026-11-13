@@ -25,7 +25,7 @@ export default function Enrollment({ auth, displayName, profile, busy, onEnroll,
         <h1>One calm account.<br/><em>Two ways to show up.</em></h1>
         <p>
           Enroll as a {seeker.short} to express yourself, a {companion.short} to hold space for others, or both on the same account.
-          No second password. Connect securely with an AI companion by voice or DM, or request a verified stranger when you are ready.
+          No second password. Connect securely with an AI companion by voice or DM, or request a verified companion when you are ready.
         </p>
       </div>
       {!auth && (
@@ -41,10 +41,10 @@ export default function Enrollment({ auth, displayName, profile, busy, onEnroll,
             <span className="eyebrow">{seeker.short.toUpperCase()}</span>
           </div>
           <h2>{seeker.long}</h2>
-          <p>Express yourself first. Save private context, then meet a stranger or an AI companion when you are ready.</p>
+          <p>Express yourself first. Save private context, then meet a companion or an AI companion when you are ready.</p>
           <ul className="simple-list">
             <li>Private notes can be encrypted at rest when configured.</li>
-            <li>Ask a stranger to talk — voice or chat after they accept.</li>
+            <li>Ask a companion to talk — voice or chat after they accept.</li>
             <li>If no one is free yet, use voice chat or DM with a fictional AI companion.</li>
           </ul>
           <div className="enroll-modes" aria-hidden="true">
@@ -84,7 +84,7 @@ export default function Enrollment({ auth, displayName, profile, busy, onEnroll,
             <span className="eyebrow">{companion.short.toUpperCase()}</span>
           </div>
           <h2>{companion.long}</h2>
-          <p>Be available for a stranger who asks. Accept only when you can stay. Enrollment is not a credential.</p>
+          <p>Be available for a companion who asks. Accept only when you can stay. Enrollment is not a credential.</p>
           <ul className="simple-list">
             <li>You get an invite code to share when you want to be found.</li>
             <li>Accept or decline each request yourself — voice or chat.</li>

@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Sparkles, Volume2, Pause, Wind, Heart, RefreshCw, Check, ArrowRight } from 'lucide-react';
+import { Sparkles, Volume2, Pause, Wind, Heart, RefreshCw, Check, ArrowRight, X } from 'lucide-react';
 import { useAmbient } from '@/components/AmbientSound';
 import BreathingExercise from '@/components/BreathingExercise';
 import type { MoodKind } from '@/lib/domain';
+import AnimatedMoodFace from '@/components/AnimatedMoodFace';
 
 type Props = {
   mood: MoodKind;
@@ -14,6 +15,7 @@ type Props = {
   onSaveReflection?: (note: string, mood: MoodKind) => void;
   onNavigate?: (view: string) => void;
   onDismiss?: () => void;
+  asModal?: boolean;
 };
 
 const MOOD_DATA: Record<
@@ -91,6 +93,7 @@ export default function MoodRelaxationCard({
   onSaveReflection,
   onNavigate,
   onDismiss,
+  asModal = false,
 }: Props) {
   const ambient = useAmbient();
   const [reflection, setReflection] = useState(initialNote || '');
@@ -123,17 +126,19 @@ export default function MoodRelaxationCard({
     setTimeout(() => setSaved(false), 3000);
   }
 
-  return (
+  const cardContent = (
     <section
       className="mood-relaxation-card"
       style={{
-        margin: '28px 5.4% 0',
-        padding: '28px 32px',
-        borderRadius: 20,
+        margin: asModal ? 0 : '28px 5.4% 0',
+        padding: asModal ? '24px 28px' : '28px 32px',
+        borderRadius: asModal ? 18 : 20,
         background: 'linear-gradient(145deg, #ffffff, #f1f6f1)',
-        border: '1px solid rgba(82, 107, 134, 0.18)',
-        boxShadow: '0 12px 36px rgba(41, 52, 64, 0.06)',
+        border: asModal ? 'none' : '1px solid rgba(82, 107, 134, 0.18)',
+        boxShadow: asModal ? 'none' : '0 12px 36px rgba(41, 52, 64, 0.06)',
         position: 'relative',
+        width: '100%',
+        boxSizing: 'border-box',
       }}
     >
       {/* Top Banner Row */}
@@ -149,9 +154,7 @@ export default function MoodRelaxationCard({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 26 }} role="img" aria-label={current.label}>
-            {current.icon}
-          </span>
+          <AnimatedMoodFace mood={mood} size={32} animated={true} />
           <div>
             <div style={{ fontSize: 11, letterSpacing: '1.8px', fontWeight: 600, color: 'var(--accent, #526b86)' }}>
               YOUR CALM SANCTUARY
@@ -186,16 +189,24 @@ export default function MoodRelaxationCard({
             <button
               type="button"
               onClick={onDismiss}
+              aria-label="Dismiss calm sanctuary"
+              title="Close quiet moment"
               style={{
-                background: 'transparent',
-                border: 'none',
+                background: asModal ? '#f1f5f9' : 'transparent',
+                border: asModal ? '1px solid #e2e8f0' : 'none',
+                borderRadius: asModal ? '50%' : 4,
                 color: '#64748b',
+                width: asModal ? 34 : 'auto',
+                height: asModal ? 34 : 'auto',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 fontSize: 12,
                 cursor: 'pointer',
-                padding: '6px 8px',
+                padding: asModal ? 0 : '6px 8px',
               }}
             >
-              Dismiss
+              {asModal ? <X size={17} /> : 'Dismiss'}
             </button>
           )}
         </div>
@@ -243,7 +254,7 @@ export default function MoodRelaxationCard({
                   fontWeight: active ? 600 : 400,
                 }}
               >
-                <span>{item.icon}</span>
+                <AnimatedMoodFace mood={m} size={20} animated={true} />
                 <span>{item.label}</span>
               </button>
             );
@@ -507,5 +518,84 @@ export default function MoodRelaxationCard({
       )}
     </section>
   );
+
+  if (asModal) {
+    return (
+      <div
+        className="modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Calm Sanctuary"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 95,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1.25rem',
+          overflowY: 'auto',
+        }}
+        onClick={onDismiss}
+      >
+        <div
+          className="modal-dialog"
+          style={{
+            width: '100%',
+            maxWidth: 920,
+            background: '#ffffff',
+            borderRadius: 22,
+            boxShadow: '0 25px 70px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(82, 107, 134, 0.2)',
+            maxHeight: '92vh',
+            overflowY: 'auto',
+            position: 'relative',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {cardContent}
+          <div
+            style={{
+              padding: '14px 28px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderTop: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              borderBottomLeftRadius: 22,
+              borderBottomRightRadius: 22,
+              flexWrap: 'wrap',
+              gap: 12,
+            }}
+          >
+            <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+              Your calm sanctuary is private. You can revisit anytime.
+            </span>
+            <button
+              type="button"
+              className="button"
+              onClick={onDismiss}
+              style={{
+                minHeight: 40,
+                padding: '10px 22px',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                borderRadius: 10,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              Continue to Saath <ArrowRight size={15} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return cardContent;
 }
 

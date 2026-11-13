@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { Armchair, ArrowRight, Pause, Play, ShieldCheck } from 'lucide-react';
@@ -211,7 +211,7 @@ export default function TwoChairsRoom({ auth, displayName, profile, aiConfigured
             This tab is {actor === 'guest' ? 'Guest' : 'Seedy'}. Switch the other tab to Guest and join with the room code.
           </p>
           <ol className="listen-steps">
-            <li><strong>1. Meet and greet</strong><span>On Listen, choose a stranger nearby.</span></li>
+            <li><strong>1. Meet and greet</strong><span>On Listen, choose a companion nearby.</span></li>
             <li><strong>2. Connect</strong><span>Open their profile, or share a room code from here.</span></li>
             <li><strong>3. Autoconnect</strong><span>Listen can pick the closest match to your answers.</span></li>
             <li className="current"><strong>4. Do the task</strong><span>Sit the steps once the other person has joined.</span></li>

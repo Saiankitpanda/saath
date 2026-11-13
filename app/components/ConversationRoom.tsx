@@ -36,7 +36,21 @@ export default function ConversationRoom({ conversation, onChange, flash, onRepo
     if (next) onChange(next);
     setDraft('');
     setBusy(false);
-    flash('Message kept in this browser fixture. No live participant received it.');
+    try {
+      await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: conversation.id,
+          senderName: 'You',
+          senderRole: 'seeker',
+          text: draft.trim().slice(0, 2000),
+        }),
+      });
+      flash('Message sent.');
+    } catch {
+      flash('Message saved locally.');
+    }
   }
 
   return (

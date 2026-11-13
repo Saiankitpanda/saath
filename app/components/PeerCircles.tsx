@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, HeartHandshake, Leaf, MessageCircle, RefreshCw, Send, ShieldCheck, Users } from 'lucide-react';
 import {
   addCirclePost,
@@ -21,6 +21,7 @@ type Props = {
   auth: boolean;
   displayName: string;
   onNotice: (message: string) => void;
+  onOpenAuth?: () => void;
 };
 
 const themes = [
@@ -42,7 +43,7 @@ function mergePosts(circleId: string, local: CirclePost[]): CirclePost[] {
   );
 }
 
-export default function PeerCircles({ auth, displayName, onNotice }: Props) {
+export default function PeerCircles({ auth, displayName, onNotice, onOpenAuth }: Props) {
   const initialMembership = loadFixtures().circleMembership;
   const [membership, setMembership] = useState<Record<string, CircleMembership>>(initialMembership);
   const [theme, setTheme] = useState<(typeof themes)[number]['id']>('all');
@@ -76,9 +77,30 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
   const active = circles.find(item => item.id === activeId) || circles[0] || circleFixtures[0];
   const status = active ? membership[active.id] || active.membership : 'none';
   const posts = active ? postsByCircle[active.id] || [] : [];
-  const canPost = status === 'approved' || status === 'requested';
+  const canPost = Boolean(auth) && (status === 'approved' || status === 'requested');
   const secrets = active ? circleSecrets[active.id] || [] : [];
   const activeSecret = secrets.find(item => item.id === secretId) || secrets[0] || null;
+
+  useEffect(() => {
+    if (!active?.id) return;
+    fetch(`/api/circles/posts?circleId=${encodeURIComponent(active.id)}`)
+      .then(res => res.json() as Promise<any>)
+      .then(data => {
+        if (data.posts && Array.isArray(data.posts)) {
+          const mapped: CirclePost[] = data.posts.map((p: any) => ({
+            id: p.id,
+            circleId: p.circleId,
+            mention: p.mention,
+            body: p.body,
+            explanation: p.explanation,
+            authorLabel: p.authorName,
+            createdAt: p.createdAt,
+          }));
+          setPostsByCircle(curr => ({ ...curr, [active.id]: mapped }));
+        }
+      })
+      .catch(() => {});
+  }, [active?.id]);
 
   function openCircle(circle: CircleRecord) {
     setActiveId(circle.id);
@@ -89,6 +111,11 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
   }
 
   function joinCircle(circle: CircleRecord) {
+    if (!auth) {
+      onNotice('Please sign in to join a circle and share with peers.');
+      onOpenAuth?.();
+      return;
+    }
     const next = setCircleMembership(circle.id, 'approved');
     setMembership(next);
     setActiveId(circle.id);
@@ -103,24 +130,65 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
     onNotice(`You left ${circle.name}.`);
   }
 
-  function publish() {
+  async function publish() {
+    if (!auth) {
+      onNotice('Please sign in to share a story in this circle.');
+      onOpenAuth?.();
+      return;
+    }
     if (!active || !mention.trim() || !draft.trim() || !explanation.trim()) return;
     if (!canPost) {
       onNotice('Join this circle before posting a story.');
       return;
     }
+
+    try {
+      const res = await fetch('/api/circles/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          circleId: active.id,
+          mention,
+          draft,
+          explanation,
+        }),
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        const newPost: CirclePost = {
+          id: data.post.id,
+          circleId: data.post.circleId,
+          mention: data.post.mention,
+          body: data.post.body,
+          explanation: data.post.explanation,
+          authorLabel: data.post.authorName,
+          createdAt: data.post.createdAt,
+        };
+        setPostsByCircle(curr => ({
+          ...curr,
+          [active.id]: [newPost, ...(curr[active.id] || [])],
+        }));
+        setMention('');
+        setDraft('');
+        setExplanation('');
+        onNotice('Story published to the circle.');
+        return;
+      }
+    } catch {}
+
     const rows = addCirclePost({
       circleId: active.id,
       mention,
       body: draft,
       explanation,
-      authorLabel: displayName || (auth ? 'You' : 'Anonymous peer'),
+      authorLabel: displayName || 'You',
     });
     setPostsByCircle(current => ({ ...current, [active.id]: mergePosts(active.id, rows) }));
     setMention('');
     setDraft('');
     setExplanation('');
-    onNotice('Story saved in this browser. The circle can read it here. Live sync needs signup.');
+    onNotice('Story saved in this circle.');
   }
 
   function repliesFor(post: CirclePost): CircleStoryReply[] {
@@ -138,17 +206,56 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
     setSimilarDraft('');
   }
 
-  function publishReply(postId: string) {
+  async function publishReply(postId: string) {
+    if (!auth) {
+      onNotice('Please sign in to answer a story.');
+      onOpenAuth?.();
+      return;
+    }
     if (!understandDraft.trim()) return;
     if (!canPost) {
       onNotice('Join this circle to answer a story.');
       return;
     }
+
+    try {
+      const res = await fetch('/api/circles/replies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId,
+          understanding: understandDraft,
+          similarStory: similarDraft,
+        }),
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        const newReply: CircleStoryReply = {
+          id: data.reply.id,
+          postId: data.reply.postId,
+          understanding: data.reply.understanding,
+          similarStory: data.reply.similarStory,
+          authorLabel: data.reply.authorName,
+          createdAt: data.reply.createdAt,
+        };
+        setRepliesByPost(curr => ({
+          ...curr,
+          [postId]: [newReply, ...(curr[postId] || [])],
+        }));
+        setUnderstandDraft('');
+        setSimilarDraft('');
+        setReplyPostId(null);
+        onNotice('The circle can see what you understood.');
+        return;
+      }
+    } catch {}
+
     const rows = addStoryReply({
       postId,
       understanding: understandDraft,
       similarStory: similarDraft,
-      authorLabel: displayName || (auth ? 'You' : 'Anonymous peer'),
+      authorLabel: displayName || 'You',
     });
     setRepliesByPost(current => ({ ...current, [postId]: rows }));
     setUnderstandDraft('');
@@ -157,23 +264,75 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
     onNotice('The circle can see what you understood.');
   }
 
-  function openSecret(id: string) {
+  async function openSecret(id: string) {
     if (!active) return;
     setSecretId(id);
+    try {
+      const res = await fetch(`/api/circles/comments?circleId=${encodeURIComponent(active.id)}&secretId=${encodeURIComponent(id)}`);
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        if (Array.isArray(data.comments)) {
+          const mapped = data.comments.map((c: any) => ({
+            id: c.id,
+            circleId: c.circleId,
+            secretId: c.secretId,
+            body: c.body,
+            authorLabel: c.authorName,
+            createdAt: c.createdAt,
+          }));
+          setSecretComments(mapped);
+          return;
+        }
+      }
+    } catch {}
     setSecretComments(listSecretComments(active.id, id));
   }
 
-  function publishComment() {
+  async function publishComment() {
+    if (!auth) {
+      onNotice('Please sign in to leave a comment on this secret.');
+      onOpenAuth?.();
+      return;
+    }
     if (!active || !activeSecret || !commentDraft.trim()) return;
     if (!canPost) {
       onNotice('Join the circle to leave a thought on a secret.');
       return;
     }
+
+    try {
+      const res = await fetch('/api/circles/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          circleId: active.id,
+          secretId: activeSecret.id,
+          comment: commentDraft,
+        }),
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        const newComment = {
+          id: data.comment.id,
+          circleId: data.comment.circleId,
+          secretId: data.comment.secretId,
+          body: data.comment.body,
+          authorLabel: data.comment.authorName,
+          createdAt: data.comment.createdAt,
+        };
+        setSecretComments(curr => [newComment, ...curr]);
+        setCommentDraft('');
+        onNotice('Comment saved with this secret.');
+        return;
+      }
+    } catch {}
+
     const rows = addSecretComment({
       circleId: active.id,
       secretId: activeSecret.id,
       body: commentDraft,
-      authorLabel: displayName || (auth ? 'You' : 'Anonymous peer'),
+      authorLabel: displayName || 'You',
     });
     setSecretComments(rows);
     setCommentDraft('');
@@ -181,6 +340,11 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
   }
 
   function publishSession() {
+    if (!auth) {
+      onNotice('Please sign in to join the conversation.');
+      onOpenAuth?.();
+      return;
+    }
     if (!active || !sessionDraft.trim()) return;
     if (status !== 'approved') {
       onNotice('Join the circle to use Joined session.');
@@ -189,7 +353,7 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
     const rows = addSessionMessage({
       circleId: active.id,
       body: sessionDraft,
-      authorLabel: displayName || (auth ? 'You' : 'Anonymous peer'),
+      authorLabel: displayName || 'You',
     });
     setSessionMessages(rows);
     setSessionDraft('');
@@ -385,6 +549,32 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
                         <ul>{activeSecret.guidance.dont.map(item => <li key={item}>{item}</li>)}</ul>
                       </div>
                     </div>
+                    {!auth && (
+                      <div style={{
+                        padding: '12px 16px',
+                        borderRadius: 12,
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: 14,
+                        marginBottom: 6,
+                        gap: 12
+                      }}>
+                        <span style={{ fontSize: '0.86rem', color: '#475569' }}>
+                          Sign in to leave a comment on this secret.
+                        </span>
+                        <button
+                          type="button"
+                          className="button"
+                          style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                          onClick={() => onOpenAuth?.()}
+                        >
+                          Sign in
+                        </button>
+                      </div>
+                    )}
                     <div className="peers-composer">
                       <label htmlFor="secret-comment">Share a thought or comment</label>
                       <textarea
@@ -428,6 +618,32 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
                   </div>
                   <span className="story-count">{posts.length} {posts.length === 1 ? 'story' : 'stories'}</span>
                 </div>
+
+                {!auth && (
+                  <div style={{
+                    padding: '12px 16px',
+                    borderRadius: 12,
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 16,
+                    gap: 12
+                  }}>
+                    <span style={{ fontSize: '0.86rem', color: '#475569' }}>
+                      Sign in to share your story or answer others in this circle.
+                    </span>
+                    <button
+                      type="button"
+                      className="button"
+                      style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                      onClick={() => onOpenAuth?.()}
+                    >
+                      Sign in
+                    </button>
+                  </div>
+                )}
 
                 <div className="peers-composer story-composer">
                   <h3>Share a story</h3>
@@ -575,10 +791,12 @@ export default function PeerCircles({ auth, displayName, onNotice }: Props) {
                     <RefreshCw size={14}/> Refresh
                   </button>
                 </header>
-                {status !== 'approved' ? (
+                {status !== 'approved' || !auth ? (
                   <div className="peers-empty">
-                    <p>Join this circle to open the session window.</p>
-                    <button className="button" type="button" onClick={() => joinCircle(active)}>Join session</button>
+                    <p>{!auth ? 'Sign in to join this circle and open the discussion.' : 'Join this circle to open the session window.'}</p>
+                    <button className="button" type="button" onClick={() => !auth ? onOpenAuth?.() : joinCircle(active)}>
+                      {!auth ? 'Sign in to join' : 'Join session'}
+                    </button>
                   </div>
                 ) : (
                   <>

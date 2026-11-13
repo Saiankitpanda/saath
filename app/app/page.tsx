@@ -21,6 +21,7 @@ import AppearanceEditor from "@/components/AppearanceEditor";
 import AuthModal from "@/components/AuthModal";
 import CrisisModal from "@/components/CrisisModal";
 import MoodRelaxationCard from "@/components/MoodRelaxationCard";
+import AnimatedMoodFace from "@/components/AnimatedMoodFace";
 import { SaathCharacter } from "@/components/SaathCharacter";
 import CharacterWait from "@/components/CharacterWait";
 import { api } from "@/lib/client/api";
@@ -71,7 +72,7 @@ import {
 } from "lucide-react";
 
 const paths = [
-  { view: "connect" as View, n: "01", icon: MessageCircle, title: "Someone to listen.", desc: "Talk with an AI companion, or connect with a real stranger after they accept.", label: "Meet someone" },
+  { view: "connect" as View, n: "01", icon: MessageCircle, title: "Someone to listen.", desc: "Talk with an AI companion, or connect with a companion after they accept.", label: "Meet someone" },
   { view: "circles" as View, n: "02", icon: Users, title: "Peer circles.", desc: "Meet people with a similar lived experience. Discuss and post when you are ready.", label: "Join a circle" },
   { view: "chairs" as View, n: "03", icon: Armchair, title: "Two chairs.", desc: "Practise the hard conversation first, then sit with someone when you are ready.", label: "Open Two Chairs" },
 ];
@@ -124,6 +125,7 @@ function App() {
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [userMood, setUserMood] = useState<MoodKind | null>(null);
+  const [sanctuaryModalOpen, setSanctuaryModalOpen] = useState(false);
   const [interests, setInterests] = useState<InterestId[]>([]);
   const [reflections, setReflections] = useState("");
   const [conversation, setConversation] = useState<ConversationRecord | null>(null);
@@ -304,7 +306,7 @@ function App() {
     setStrangerOpen(true);
     setListenStep("meet");
     go("connect");
-    flash("Choose a stranger nearby. People who fit your answers appear after you open it.");
+    flash("Choose a companion nearby. People who fit your answers appear after you open it.");
   }
   function revealNearby() {
     setStrangerOpen(true);
@@ -377,9 +379,11 @@ function App() {
         setReflections(curr => (curr ? `${user.initialReflection}\n---\n${curr}` : user.initialReflection!));
         saveReflections(user.initialReflection);
       }
+
+      setSanctuaryModalOpen(true);
     }
 
-    flash(`Welcome, ${name}. Your calm sanctuary is ready below.`);
+    flash(`Welcome, ${name}.`);
     go("home");
   }
 
@@ -439,17 +443,17 @@ function App() {
 
   async function connectStranger() {
     if (!auth) {
-      flash("Sign in to ask a real stranger to talk with you.");
+      flash("Sign in to ask a companion to talk with you.");
       return;
     }
     if (!pairingCode.trim()) {
-      flash("Ask someone for their invite code, or open Two chairs and share your room code with a stranger.");
+      flash("Ask someone for their invite code, or open Two chairs and share your room code with a companion.");
       return;
     }
     setBusy(true);
     try {
       const result = await api<{ request: SessionRequest; notice?: string }>("/api/requests", "POST", {
-        topic: strangerMode === "voice" ? "Voice with a stranger" : "Chat with a stranger",
+        topic: strangerMode === "voice" ? "Voice with a companion" : "Chat with a companion",
         context: strangerNote || context || "I would like to talk when you have a moment.",
         consent: true,
         mode: strangerMode,
@@ -470,7 +474,14 @@ function App() {
     try {
       const result = await api<{ request: SessionRequest }>("/api/requests", "PATCH", { id, action });
       setIncoming(current => current.map(item => item.id === id ? result.request : item));
-      flash(action === "accept" ? "You accepted this request. Both accounts now show it as accepted." : "You declined this request.");
+      flash(action === "accept" ? "You accepted this request. Opening connection..." : "You declined this request.");
+      if (action === "accept") {
+        if (result.request.mode === "voice" || result.request.mode === "video") {
+          void startCall(result.request.id, result.request.mode);
+        } else {
+          setChatRequest(result.request);
+        }
+      }
     } catch (error) {
       flash((error as Error).message);
     } finally {
@@ -659,6 +670,30 @@ function App() {
                   )}
                 </div>
               ) : null}
+              {userMood && (
+                <button
+                  type="button"
+                  onClick={() => setSanctuaryModalOpen(true)}
+                  title="Open your Calm Sanctuary"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    color: "#334155",
+                    background: "#f8faf9",
+                    minHeight: 36,
+                    padding: "6px 12px",
+                    borderRadius: 20,
+                    border: "1px solid rgba(82, 107, 134, 0.22)",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 500,
+                  }}
+                >
+                  <AnimatedMoodFace mood={userMood} size={18} animated={false} />
+                  <span className="hide-mobile" style={{ textTransform: "capitalize" }}>Calm Space</span>
+                </button>
+              )}
               <button
                 type="button"
                 className="button small"
@@ -705,50 +740,6 @@ function App() {
 
       {view === "home" ? (
         <main>
-          {userMood && (
-            <MoodRelaxationCard
-              mood={userMood}
-              userName={displayName}
-              initialNote={moods[0]?.note}
-              onMoodChange={(nextMood) => {
-                setUserMood(nextMood);
-                try {
-                  localStorage.setItem("saath_current_mood", nextMood);
-                } catch {}
-                setMoods(curr => [
-                  {
-                    id: `mood-${Date.now()}`,
-                    mood: nextMood,
-                    note: `Updated feeling: ${nextMood}`,
-                    createdAt: new Date().toISOString(),
-                  },
-                  ...curr,
-                ]);
-                flash(`Your calm sanctuary has been tuned for feeling ${nextMood}.`);
-              }}
-              onSaveReflection={(note, m) => {
-                setMoods(curr => [
-                  {
-                    id: `mood-${Date.now()}`,
-                    mood: m,
-                    note,
-                    createdAt: new Date().toISOString(),
-                  },
-                  ...curr,
-                ]);
-                setReflections(curr => (curr ? `${note}\n---\n${curr}` : note));
-                saveReflections(note);
-                flash("Your quiet reflection is saved in My Space.");
-              }}
-              onNavigate={(dest) => go(dest as View)}
-              onDismiss={() => {
-                setUserMood(null);
-                try {
-                  localStorage.removeItem("saath_current_mood");
-                } catch {}
-              }}
-            />
-          )}
           <section className="hero">
             <div className="hero-copy">
               <div className="eyebrow"><span/> EARLY PREVIEW Â· 18+</div>
@@ -800,6 +791,88 @@ function App() {
         </main>
       ) : (
         <main className="workspace">
+          {/* Real-time Incoming Companion Request / Call Alert Banner */}
+          {incoming.filter(item => item.status === "pending").length > 0 && (
+            <aside
+              role="alert"
+              style={{
+                position: 'sticky',
+                top: 14,
+                zIndex: 60,
+                margin: '0 auto 20px',
+                maxWidth: 680,
+                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                color: '#ffffff',
+                padding: '14px 20px',
+                borderRadius: 16,
+                boxShadow: '0 12px 28px -5px rgba(15, 23, 42, 0.45)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 16,
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: '50%',
+                  background: '#38bdf8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#0f172a',
+                  flexShrink: 0,
+                }}>
+                  {incoming.filter(item => item.status === "pending")[0].mode === 'voice' ? <Phone size={20} /> : <MessageCircle size={20} />}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontWeight: 700 }}>
+                    Incoming {incoming.filter(item => item.status === "pending")[0].mode === 'voice' ? 'Voice Call' : incoming.filter(item => item.status === "pending")[0].mode === 'video' ? 'Video Call' : 'Chat Request'}
+                  </div>
+                  <div style={{ fontSize: '0.96rem', fontWeight: 700, color: '#f8fafc', marginTop: 1 }}>
+                    {incoming.filter(item => item.status === "pending")[0].topic}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => actOnIncoming(incoming.filter(item => item.status === "pending")[0].id, 'accept')}
+                  style={{
+                    background: '#22c55e',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 18px',
+                    borderRadius: 10,
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => actOnIncoming(incoming.filter(item => item.status === "pending")[0].id, 'decline')}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    color: '#cbd5e1',
+                    border: 'none',
+                    padding: '8px 14px',
+                    borderRadius: 10,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Decline
+                </button>
+              </div>
+            </aside>
+          )}
           {view === "enroll" && (
             <Enrollment
               auth={auth}
@@ -846,6 +919,7 @@ function App() {
               peerName={chatRequest.providerName}
               onClose={() => setChatRequest(null)}
               onNotice={flash}
+              onOpenAuth={() => setAuthModalOpen(true)}
             />
           )}
 
@@ -893,6 +967,7 @@ function App() {
               auth={auth}
               displayName={displayName}
               onNotice={flash}
+              onOpenAuth={() => setAuthModalOpen(true)}
             />
           )}
 
@@ -909,10 +984,10 @@ function App() {
                 <div className="listen-hero-copy">
                   <div className="eyebrow">LISTEN Â· THEN ACT</div>
                   <h1>A quiet companion<br/>when you need to <em>speak.</em></h1>
-                  <p>Choose a stranger nearby when you are ready. People who fit what you answered appear only after that.</p>
+                  <p>Choose a companion nearby when you are ready. People who fit what you answered appear only after that.</p>
                   <div className="listen-hero-actions">
                     <button className="button" type="button" onClick={revealNearby}>
-                      Choose a stranger nearby <ArrowRight size={17}/>
+                      Choose a companion nearby <ArrowRight size={17}/>
                     </button>
                   </div>
                 </div>
@@ -946,7 +1021,7 @@ function App() {
                 >
                   <span>
                     <Users size={18} strokeWidth={1.5}/>
-                    <strong>Talk to a stranger</strong>
+                    <strong>Talk to a companion</strong>
                     <em>Nearby list Â· same situation Â· auto-match</em>
                   </span>
                   <span className="stranger-accordion-chevron">{strangerOpen ? "Matches open" : "Choose nearby"}</span>
@@ -957,7 +1032,7 @@ function App() {
                     Invite-code requests still work below for people you already know.
                   </p>
                   <button className="button" type="button" onClick={() => go("strangers")}>
-                    Choose a stranger nearby <ArrowRight size={16}/>
+                    Choose a companion nearby <ArrowRight size={16}/>
                   </button>
                   <div className="two-column" style={{ marginTop: 18 }}>
                     <section className="plain-panel meet-panel">
@@ -968,7 +1043,7 @@ function App() {
                       <label htmlFor="pairing-code">Their invite code
                         <input id="pairing-code" value={pairingCode} onChange={event => setPairingCode(event.target.value.toUpperCase())} maxLength={6} placeholder="AB23CD"/>
                       </label>
-                      <div className="meet-mode-grid stranger-mode-grid" role="radiogroup" aria-label="Stranger connection mode">
+                      <div className="meet-mode-grid stranger-mode-grid" role="radiogroup" aria-label="Companion connection mode">
                         {([
                           ["voice", "Voice", Phone],
                           ["chat", "Chat", MessageCircle],
@@ -1049,7 +1124,7 @@ function App() {
                     </li>
                     <li className={listenStep === "connect" || listenStep === "auto" ? "current" : ""}>
                       <strong>2. Autoconnect</strong>
-                      <span>The server picks the closest stranger and opens the call with your situation.</span>
+                      <span>The server matches the closest companion and opens the call with your situation.</span>
                     </li>
                     <li className={listenStep === "task" ? "current" : ""}>
                       <strong>3. The call</strong>
@@ -1076,6 +1151,7 @@ function App() {
                         peerName={aiChatPerson.name}
                         onClose={() => setAiChatPerson(null)}
                         onNotice={flash}
+                        onOpenAuth={() => setAuthModalOpen(true)}
                       />
                     </section>
                   )}
@@ -1097,6 +1173,7 @@ function App() {
                       peerName={chatRequest.providerName}
                       onClose={() => setChatRequest(null)}
                       onNotice={flash}
+                      onOpenAuth={() => setAuthModalOpen(true)}
                     />
                   )}
                 </section>
@@ -1118,7 +1195,7 @@ function App() {
                     id: `near-${peerId}`,
                     providerId: peerId,
                     providerName: peerName,
-                    topic: mode === "video" ? "Video call with a stranger" : mode === "voice" ? "Voice with a stranger" : "Chat with a stranger",
+                    topic: mode === "video" ? "Video call with a companion" : mode === "voice" ? "Voice with a companion" : "Chat with a companion",
                     context: note,
                     mode: mode === "chat" ? "chat" : "voice",
                     status: "accepted",
@@ -1151,6 +1228,7 @@ function App() {
                   peerName={chatRequest.providerName}
                   onClose={() => setChatRequest(null)}
                   onNotice={flash}
+                  onOpenAuth={() => setAuthModalOpen(true)}
                 />
               )}
               {activeCall && (
@@ -1348,6 +1426,52 @@ function App() {
           initialRole={authModalRole}
           onClose={() => setAuthModalOpen(false)}
           onAuthSuccess={handleAuthSuccess}
+        />
+      )}
+
+      {sanctuaryModalOpen && userMood && (
+        <MoodRelaxationCard
+          asModal={true}
+          mood={userMood}
+          userName={displayName}
+          initialNote={moods[0]?.note}
+          onMoodChange={(nextMood) => {
+            setUserMood(nextMood);
+            try {
+              localStorage.setItem("saath_current_mood", nextMood);
+            } catch {}
+            setMoods(curr => [
+              {
+                id: `mood-${Date.now()}`,
+                mood: nextMood,
+                note: `Updated feeling: ${nextMood}`,
+                createdAt: new Date().toISOString(),
+              },
+              ...curr,
+            ]);
+            flash(`Your calm sanctuary has been tuned for feeling ${nextMood}.`);
+          }}
+          onSaveReflection={(note, m) => {
+            setMoods(curr => [
+              {
+                id: `mood-${Date.now()}`,
+                mood: m,
+                note,
+                createdAt: new Date().toISOString(),
+              },
+              ...curr,
+            ]);
+            setReflections(curr => (curr ? `${note}\n---\n${curr}` : note));
+            saveReflections(note);
+            flash("Your quiet reflection is saved in My Space.");
+          }}
+          onNavigate={(dest) => {
+            setSanctuaryModalOpen(false);
+            go(dest as View);
+          }}
+          onDismiss={() => {
+            setSanctuaryModalOpen(false);
+          }}
         />
       )}
 

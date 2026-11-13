@@ -79,7 +79,7 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
   function autoMatch() {
     const pool = sameSituation.length ? sameSituation : nearby;
     if (!pool.length) {
-      onNotice('No strangers in this radius right now. Widen the circle or try again shortly.');
+      onNotice('No companions in this radius right now. Widen the circle or try again shortly.');
       return;
     }
     const pick = pool[Math.floor(Math.random() * pool.length)];
@@ -92,7 +92,7 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
 
   function reconnect() {
     if (!pref?.lastPeerId) {
-      onNotice('No previous stranger to reconnect with yet.');
+      onNotice('No previous companion to reconnect with yet.');
       return;
     }
     const found = nearbyStrangerFixtures.find(item => item.id === pref.lastPeerId);
@@ -132,7 +132,7 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
       <header className="strangers-hero">
         <div>
           <div className="eyebrow">NEARBY · DIAL TO CONNECT</div>
-          <h1>Talk to a stranger<br/>within <em>reach.</em></h1>
+          <h1>Talk to a companion<br/>within <em>reach.</em></h1>
           <p>
             Choose someone nearby — or auto-match the same situation — then dial voice or open chat.
             No waiting lobby: the line rings, then connects.
@@ -254,7 +254,7 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
             </section>
           )}
 
-          <section className="strangers-list" aria-label="Strangers in radius">
+          <section className="strangers-list" aria-label="Companions in radius">
             <div className="eyebrow">IN RADIUS · {nearby.length} AVAILABLE</div>
             {nearby.map(item => (
               <article
@@ -285,7 +285,7 @@ export default function StrangersNearby({ auth, onBack, onNotice, onConnect }: P
               </article>
             ))}
             {!nearby.length && (
-              <p className="small-print">No available strangers in this radius. Try 10 km or come back later.</p>
+              <p className="small-print">No available companions in this radius. Try 10 km or come back later.</p>
             )}
           </section>
 

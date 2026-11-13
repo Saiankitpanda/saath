@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, Send } from 'lucide-react';
 
 type Message = { id: string; from: 'you' | 'them'; text: string; at: string };
@@ -10,44 +10,76 @@ type Props = {
   peerName: string;
   onClose: () => void;
   onNotice: (message: string) => void;
+  onOpenAuth?: () => void;
 };
 
-function storageKey(requestId: string) {
-  return `saath-stranger-chat:${requestId}`;
-}
-
-export default function StrangerChat({ requestId, peerName, onClose, onNotice }: Props) {
+export default function StrangerChat({ requestId, peerName, onClose, onNotice, onOpenAuth }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const currentUserIdRef = useRef<string | null>(null);
+
+  const fetchLiveMessages = async () => {
+    try {
+      const res = await fetch(`/api/chat?requestId=${encodeURIComponent(requestId)}`);
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        if (data.currentUserId) currentUserIdRef.current = data.currentUserId;
+        if (Array.isArray(data.messages)) {
+          const mapped: Message[] = data.messages.map((m: any) => ({
+            id: m.id,
+            from: currentUserIdRef.current && m.senderId === currentUserIdRef.current ? 'you' : 'them',
+            text: m.text,
+            at: m.at,
+          }));
+          setMessages(mapped);
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  };
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(storageKey(requestId));
-      if (raw) setMessages(JSON.parse(raw) as Message[]);
-    } catch {
-      setMessages([]);
-    }
+    void fetchLiveMessages();
+    const interval = setInterval(() => {
+      void fetchLiveMessages();
+    }, 2500);
+    return () => clearInterval(interval);
   }, [requestId]);
 
-  function persist(next: Message[]) {
-    setMessages(next);
-    try {
-      window.localStorage.setItem(storageKey(requestId), JSON.stringify(next));
-    } catch {
-      /* ignore quota */
-    }
-  }
-
-  function send() {
+  async function send() {
     const text = draft.trim();
-    if (!text) return;
-    const next = [
-      ...messages,
-      { id: crypto.randomUUID(), from: 'you' as const, text, at: new Date().toISOString() },
-    ];
-    persist(next);
-    setDraft('');
-    onNotice('Message saved in this chat room on your device. The other person sees it when they open the same connection here.');
+    if (!text || sending) return;
+    setSending(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, text }),
+      });
+
+      if (res.status === 401) {
+        onNotice('Please sign in to send messages.');
+        onOpenAuth?.();
+        setSending(false);
+        return;
+      }
+
+      if (res.ok) {
+        setDraft('');
+        await fetchLiveMessages();
+        onNotice('Message delivered.');
+      } else {
+        const err = (await res.json().catch(() => ({}))) as any;
+        onNotice(err.error || 'Failed to deliver message.');
+      }
+    } catch {
+      onNotice('Network issue while sending message.');
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -56,7 +88,7 @@ export default function StrangerChat({ requestId, peerName, onClose, onNotice }:
         <div>
           <span className="eyebrow">CHAT ROOM · DM</span>
           <h2 id="stranger-chat-title">With {peerName}</h2>
-          <p className="small-print">Private to this accepted connection. Stored in this browser for now — not a public channel.</p>
+          <p className="small-print">Private, real-time companion connection. Messages are synchronized live between both participants.</p>
         </div>
         <button type="button" className="quiet" onClick={onClose}>Close chat</button>
       </div>
@@ -77,13 +109,14 @@ export default function StrangerChat({ requestId, peerName, onClose, onNotice }:
         <input
           value={draft}
           onChange={event => setDraft(event.target.value)}
-          onKeyDown={event => { if (event.key === 'Enter') send(); }}
+          onKeyDown={event => { if (event.key === 'Enter') void send(); }}
           maxLength={1000}
           placeholder="Write a message…"
           aria-label="Chat message"
+          disabled={sending}
         />
-        <button type="button" className="button" disabled={!draft.trim()} onClick={send}>
-          Send <Send size={15}/>
+        <button type="button" className="button" disabled={!draft.trim() || sending} onClick={() => void send()}>
+          {sending ? 'Sending...' : <>Send <Send size={15}/></>}
         </button>
       </div>
     </section>
