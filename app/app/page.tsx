@@ -21,7 +21,6 @@ import AppearanceEditor from "@/components/AppearanceEditor";
 import AuthModal from "@/components/AuthModal";
 import CrisisModal from "@/components/CrisisModal";
 import MoodRelaxationCard from "@/components/MoodRelaxationCard";
-import AnimatedMoodFace from "@/components/AnimatedMoodFace";
 import { SaathCharacter } from "@/components/SaathCharacter";
 import CharacterWait from "@/components/CharacterWait";
 import { api } from "@/lib/client/api";
@@ -379,8 +378,6 @@ function App() {
         setReflections(curr => (curr ? `${user.initialReflection}\n---\n${curr}` : user.initialReflection!));
         saveReflections(user.initialReflection);
       }
-
-      setSanctuaryModalOpen(true);
     }
 
     flash(`Welcome, ${name}.`);
@@ -390,6 +387,9 @@ function App() {
   async function handleSignOut() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
+    } catch {}
+    try {
+      document.cookie = "__sites_local_auth=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     } catch {}
     setAuth(false);
     setDisplayName("");
@@ -670,30 +670,6 @@ function App() {
                   )}
                 </div>
               ) : null}
-              {userMood && (
-                <button
-                  type="button"
-                  onClick={() => setSanctuaryModalOpen(true)}
-                  title="Open your Calm Sanctuary"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    color: "#334155",
-                    background: "#f8faf9",
-                    minHeight: 36,
-                    padding: "6px 12px",
-                    borderRadius: 20,
-                    border: "1px solid rgba(82, 107, 134, 0.22)",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 500,
-                  }}
-                >
-                  <AnimatedMoodFace mood={userMood} size={18} animated={false} />
-                  <span className="hide-mobile" style={{ textTransform: "capitalize" }}>Calm Space</span>
-                </button>
-              )}
               <button
                 type="button"
                 className="button small"
