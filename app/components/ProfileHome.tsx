@@ -31,6 +31,7 @@ type Props = {
   onNotice: (message: string) => void;
   onMotionChange: (enabled: boolean) => void;
   onEnroll: () => void;
+  onSignIn?: () => void;
   onSwitchRole: (role: EnrollmentRole) => void;
   context: string;
   onContextChange: (value: string) => void;
@@ -68,6 +69,7 @@ export default function ProfileHome({
   onNotice,
   onMotionChange,
   onEnroll,
+  onSignIn,
   onSwitchRole,
   context,
   onContextChange,
@@ -140,7 +142,25 @@ export default function ProfileHome({
       {!auth && (
         <div className="space-notice">
           <ShieldCheck size={18}/>
-          <span>Sign in to save context on the server and to send a real connection request. Until then, writing stays in this browser. <a href="/signin-with-chatgpt?return_to=/?view=profile">Sign in</a></span>
+          <span>
+            Sign in to save context on the server and to send a real connection request. Until then, writing stays in this browser.{" "}
+            <button
+              type="button"
+              onClick={onSignIn}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--accent, #a6593a)",
+                textDecoration: "underline",
+                cursor: "pointer",
+                padding: 0,
+                font: "inherit",
+                fontWeight: 600,
+              }}
+            >
+              Sign in
+            </button>
+          </span>
         </div>
       )}
       {encryptionAtRest && (
@@ -176,9 +196,9 @@ export default function ProfileHome({
         )}
         <div className="profile-identity-actions">
           {!auth && (
-            <a className="button" href="/signin-with-chatgpt?return_to=/?view=profile">
+            <button type="button" className="button" onClick={onSignIn}>
               <ShieldCheck size={16} /> Sign in
-            </a>
+            </button>
           )}
           <button type="button" className={auth ? 'button' : 'outline-button'} onClick={onEnroll}>
             {enrolled ? 'Manage enrollment' : 'Enroll'} <ArrowRight size={16} />

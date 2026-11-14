@@ -562,7 +562,8 @@ function App() {
   async function autoconnect() {
     setListenStep("auto");
     if (!auth) {
-      window.location.href = `/signin-with-chatgpt?return_to=${encodeURIComponent("/?view=connect&autoconnect=1")}`;
+      setAuthModalRole("client");
+      setAuthModalOpen(true);
       return;
     }
     try {
@@ -1267,6 +1268,7 @@ function App() {
               onNotice={flash}
               onMotionChange={setMotionEnabled}
               onEnroll={() => go("enroll")}
+              onSignIn={() => { setAuthModalRole("client"); setAuthModalOpen(true); }}
               onSwitchRole={switchRole}
               context={context}
               onContextChange={setContext}
