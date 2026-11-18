@@ -287,19 +287,19 @@ function App() {
     setSelected(null);
     setPractiseSeed({
       situation: person.specialty || "Just need to talk",
-      story: `${person.name} Â· ${person.intro}\nI want to talk about: ${person.quote}`,
+      story: `${person.name} · ${person.intro}\nI want to talk about: ${person.quote}`,
       goal: `Talk about ${person.specialty.toLowerCase()}`,
     });
     setChairsFocus("practise");
     go("chairs");
-    flash(`${person.name} is a fictional AI companion. Describe your scenario under Two chairs â†’ Practise, then rehearse. No video with AI.`);
+    flash(`${person.name} is a fictional AI companion. Describe your scenario under Two chairs → Practise, then rehearse. No video with AI.`);
   }
 
   function dmWithPersona(person: Person) {
     setActiveCall(null);
     setChatRequest(null);
     setAiChatPerson(person);
-    flash(`DM with ${person.name} is open. Fictional companion â€” not a live person.`);
+    flash(`DM with ${person.name} is open. Fictional companion — not a live person.`);
   }
   function askForPerson() {
     setStrangerOpen(true);
@@ -325,7 +325,7 @@ function App() {
       setActiveCall(result.call);
       setChatRequest(null);
       flash(media === "video"
-        ? "Video room is ringing. Camera stays off until you Join â€” Meet-style browser call."
+        ? "Video room is ringing. Camera stays off until you Join — Meet-style browser call."
         : "Voice room is ringing. Microphone stays off until you Join.");
     } catch (error) {
       flash((error as Error).message);
@@ -626,11 +626,11 @@ function App() {
       />
       {appBooting && (
         <div className="app-boot-overlay">
-          <CharacterWait kind="app" message="Getting your space readyâ€¦" motionEnabled={motionEnabled} />
+          <CharacterWait kind="app" message="Getting your space ready…" motionEnabled={motionEnabled} />
         </div>
       )}
       <header className="header">
-        <button className="brand" onClick={() => go("home")} aria-label="Saath home"><span className="brand-mark"><i/><i/></span>saath<span className="brand-dot">.</span></button>
+        <button className="brand" onClick={() => go("home")} aria-label="Saathi home"><span className="brand-mark"><i/><i/></span>saathi<span className="brand-dot">.</span></button>
         <nav className={mobile ? "main-nav open" : "main-nav"} aria-label="Main navigation">
           <button className={view === "arrive" ? "active" : ""} onClick={() => go("arrive")}>Your visit</button>
           <button className={view === "connect" || view === "strangers" ? "active" : ""} onClick={() => go("connect")}>Listen</button>
@@ -719,22 +719,21 @@ function App() {
         <main>
           <section className="hero">
             <div className="hero-copy">
-              <div className="eyebrow"><span/> EARLY PREVIEW Â· 18+</div>
-              <h1>A little space.<br/>A little <em>Saath.</em></h1>
-              <p className="hero-description">Talk to someone. Practise whatâ€™s hard to say.</p>
+              <div className="eyebrow"><span/> EARLY PREVIEW · 18+</div>
+              <h1>A little space.<br/>A little <em>Saathi.</em></h1>
+              <p className="hero-description">Talk to someone. Practise what's hard to say.</p>
               <div className="hero-actions">
                 <button className="button" onClick={() => go(profile ? "arrive" : "enroll")}>
                   {profile ? "Continue your visit" : "Enroll or sign in"} <ArrowRight size={18}/>
                 </button>
                 <button className="text-button" onClick={() => go("connect")}>Listen</button>
               </div>
-              <div className="language-note"><Globe size={14}/> English <span>Â·</span> à¤¹à¤¿à¤¨à¥à¤¦à¥€ <span>Â·</span> Hinglish</div>
-              <div className="hero-footnote"><span className="tiny-flower">âœ³</span> Adults 18+. No perfect words needed.</div>
+              <div className="language-note"><Globe size={14}/> English <span>·</span> हिन्दी <span>·</span> Hinglish</div>
+              <div className="hero-footnote"><span className="tiny-flower">✻</span> Adults 18+. No perfect words needed.</div>
             </div>
             <div className="hero-art">
               <div className="art-backdrop"/>
               <img src="/assets/saath-garden-hero.png" alt="A quiet garden courtyard with two empty chairs and soft natural light"/>
-              <div className="conversation-note"><span>You can start withâ€¦</span><p>â€œI donâ€™t know<br/>where to begin.â€</p><span className="note-line"/></div>
               <div className="art-caption"><span className="small-dot"/> Two chairs. Room to arrive slowly.</div>
             </div>
             <svg className="thread" viewBox="0 0 400 120" aria-hidden="true"><path d="M0 95 C95 140 230 15 200 20 C150 28 195 120 400 0"/></svg>
@@ -959,7 +958,7 @@ function App() {
                 </div>
                 <div className="listen-hero-veil" aria-hidden="true" />
                 <div className="listen-hero-copy">
-                  <div className="eyebrow">LISTEN Â· THEN ACT</div>
+                  <div className="eyebrow">LISTEN · THEN ACT</div>
                   <h1>A quiet companion<br/>when you need to <em>speak.</em></h1>
                   <p>Choose a companion nearby when you are ready. People who fit what you answered appear only after that.</p>
                   <div className="listen-hero-actions">
@@ -999,7 +998,7 @@ function App() {
                   <span>
                     <Users size={18} strokeWidth={1.5}/>
                     <strong>Talk to a companion</strong>
-                    <em>Nearby list Â· same situation Â· auto-match</em>
+                    <em>Nearby list · same situation · auto-match</em>
                   </span>
                   <span className="stranger-accordion-chevron">{strangerOpen ? "Matches open" : "Choose nearby"}</span>
                 </button>
@@ -1092,11 +1091,11 @@ function App() {
                           <div className="request-row" key={item.id}>
                             <div>
                               <strong>{item.name}</strong>
-                              <span>{item.situation} Â· {item.distanceKm} km</span>
+                              <span>{item.situation} · {item.distanceKm} km</span>
                             </div>
                           </div>
                         ))}
-                        {!serverStrangers.length && <p className="small-print">Loading peopleâ€¦</p>}
+                        {!serverStrangers.length && <p className="small-print">Loading people…</p>}
                       </div>
                     </li>
                     <li className={listenStep === "connect" || listenStep === "auto" ? "current" : ""}>
@@ -1310,7 +1309,7 @@ function App() {
 
       <footer className="footer">
         <div className="footer-top">
-          <button className="brand" onClick={() => go("home")}><span className="brand-mark"><i/><i/></span>saath<span className="brand-dot">.</span></button>
+          <button className="brand" onClick={() => go("home")}><span className="brand-mark"><i/><i/></span>saathi<span className="brand-dot">.</span></button>
           <span className="footer-tagline">Someone alongside you.</span>
           <div>
             <button onClick={() => setModal("approach")}>Our approach</button>
@@ -1319,7 +1318,7 @@ function App() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>Â© {new Date().getFullYear()} Saath Â· An early, private preview</span>
+          <span>© {new Date().getFullYear()} Saathi · An early, private preview</span>
           <p>For adults 18+. Peer support and AI rehearsal are not emergency services or a substitute for professional care. End-to-end encryption is not claimed.</p>
         </div>
       </footer>
@@ -1334,36 +1333,36 @@ function App() {
                 <div className="appearance-preview-art" style={{ marginBottom: 12 }}>
                   <SaathCharacter name={selected.characterKey || "mira"} size={120} alt="" />
                 </div>
-                <h2 id="modal-title">{selected.name} Â· {selected.specialty}</h2>
+                <h2 id="modal-title">{selected.name} · {selected.specialty}</h2>
                 <p>{SAMPLE_PROFILE_NOTICE} Domain: {selected.domain}.</p>
-                <p className="small-print">Choosing {selected.name} changes only the AI persona â€” never your human identity. Connect here, then work the conversation together.</p>
+                <p className="small-print">Choosing {selected.name} changes only the AI persona — never your human identity. Connect here, then work the conversation together.</p>
                 <label>How would you like to be supported?<select value={support} onChange={event => setSupport(event.target.value)}><option>Listen only</option><option>Help me reflect</option><option>Offer suggestions</option></select></label>
-                <p className="small-print">Modes: Message{voiceConfigured ? " Â· Voice" : ""} Â· no video with AI.</p>
-                <label>Context to include<textarea value={context} onChange={event => setContext(event.target.value)} maxLength={4000} placeholder="Only what you want this personality to hearâ€¦"/></label>
+                <p className="small-print">Modes: Message{voiceConfigured ? " · Voice" : ""} · no video with AI.</p>
+                <label>Context to include<textarea value={context} onChange={event => setContext(event.target.value)} maxLength={4000} placeholder="Only what you want this personality to hear…"/></label>
                 <button className="button full" onClick={() => { setListenStep("connect"); setSelected(null); dmWithPersona(selected); }}>Connect with {selected.name}<ArrowRight size={17}/></button>
                 <button className="outline-button" onClick={() => { setListenStep("task"); setSelected(null); talkWithPersona(selected); }}>Work with {selected.name}</button>
-                <button className="outline-button" onClick={() => { setSelected(null); askForPerson(); }}>Iâ€™d rather talk with a person</button>
+                <button className="outline-button" onClick={() => { setSelected(null); askForPerson(); }}>I'd rather talk with a person</button>
                 <label className="checkbox-label"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)}/> I understand this is a sample request only, not a live person.</label>
-                <button className="quiet" disabled={!consent || busy} onClick={requestPerson}>{busy ? "Savingâ€¦" : "Save a sample request anyway"}</button>
+                <button className="quiet" disabled={!consent || busy} onClick={requestPerson}>{busy ? "Saving…" : "Save a sample request anyway"}</button>
                 <button className="quiet" onClick={() => setBlocks(toggleBlock(selected.id))}>{blocks.includes(selected.id) ? "Unblock in this browser" : "Block in this browser"}</button>
                 {!auth && <button type="button" className="sign-in-link text-button" onClick={() => { setModal(null); setAuthModalOpen(true); }}>Sign in to save requests</button>}
               </>
             )}
             {modal === "approach" && (
               <>
-                <div className="eyebrow">A LITTLE SUPPORT. A LITTLE SAATH.</div>
+                <div className="eyebrow">A LITTLE SUPPORT. A LITTLE SAATHI.</div>
                 <h2 id="modal-title">You set the pace.</h2>
                 <div className="approach-step"><span>01</span><div><h3>Start with what you need.</h3><p>A live listener by pairing code, a fictional AI personality, or Two chairs to practise first.</p></div></div>
                 <div className="approach-step"><span>02</span><div><h3>Choose what to share.</h3><p>Your context is yours. Review it before any connection request.</p></div></div>
                 <div className="approach-step"><span>03</span><div><h3>Make room to be heard.</h3><p>Under Two chairs, describe the scenario, let AI understand it, rehearse, then sit with someone when you are ready.</p></div></div>
-                <button className="button full" onClick={() => { setModal(null); go("connect"); }}>Explore Saath <ArrowRight size={17}/></button>
+                <button className="button full" onClick={() => { setModal(null); go("connect"); }}>Explore Saathi <ArrowRight size={17}/></button>
               </>
             )}
             {modal === "privacy" && (
               <>
                 <div className="eyebrow">CLEAR BOUNDARIES</div>
                 <h2 id="modal-title">Your story belongs to you.</h2>
-                <p>AI personalities are fictional. Unsaved writing stays in this tab. Signed-in context and requests are stored on Vinext/D1 and access is limited to their owner. Context can be encrypted at rest when configured â€” that is not end-to-end encryption.</p>
+                <p>AI personalities are fictional. Unsaved writing stays in this tab. Signed-in context and requests are stored on Vinext/D1 and access is limited to their owner. Context can be encrypted at rest when configured — that is not end-to-end encryption.</p>
                 <p>AI rehearsal only sends text after you opt in. Browser voice calling exists between two enrolled people after a request is accepted (Two Chairs / calls API). There is no call recording, and end-to-end encryption is not claimed.</p>
                 <p>You can delete your context from the profile icon. Previously viewed content cannot be unremembered by a person who already saw it.</p>
                 <button className="button full" onClick={() => { setModal(null); go("profile"); }}>Manage my context <ArrowRight size={17}/></button>
